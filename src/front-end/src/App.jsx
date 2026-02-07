@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import axios from 'axios'
 import './App.css'
@@ -135,7 +135,7 @@ function App() {
     })
   }
 
-  const handleAssigneeKeyPress = (e) => {
+  const handleAssigneeKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddAssignee()
@@ -269,7 +269,7 @@ function App() {
                     placeholder="Add assignee (press Enter)"
                     value={formData.currentAssignee}
                     onChange={(e) => setFormData({ ...formData, currentAssignee: e.target.value })}
-                    onKeyPress={handleAssigneeKeyPress}
+                    onKeyDown={handleAssigneeKeyDown}
                     className="input"
                   />
                   <button
@@ -389,8 +389,14 @@ function App() {
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
-                                      e.target.blur()
+                                      e.preventDefault()
+                                      if (e.target.value !== todo.title) {
+                                        handleInlineEditSave(todo, 'title', e.target.value)
+                                      } else {
+                                        handleInlineEditCancel()
+                                      }
                                     } else if (e.key === 'Escape') {
+                                      e.preventDefault()
                                       handleInlineEditCancel()
                                     }
                                   }}
@@ -419,6 +425,7 @@ function App() {
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Escape') {
+                                      e.preventDefault()
                                       handleInlineEditCancel()
                                     }
                                   }}

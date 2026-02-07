@@ -411,10 +411,6 @@ body {
   font-size: 0.75rem;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.todo-item:not(.completed):hover::before {
   opacity: 1;
+  transition: opacity 0.3s;
 }
