@@ -26,7 +26,7 @@ function App() {
     currentAssignee: '',
     isRecurring: false,
     frequency: 'daily',
-    interval: 1,
+    interval: '1',
     daysOfWeek: [],
   })
 
@@ -68,7 +68,7 @@ function App() {
             toRecurring: true,
             pattern: {
               frequency: formData.frequency,
-              interval: parseInt(formData.interval),
+              interval: parseInt(formData.interval) || 1,
               daysOfWeek: formData.daysOfWeek,
             },
           })
@@ -94,7 +94,7 @@ function App() {
           assignedTo: formData.assignedTo,
           pattern: {
             frequency: formData.frequency,
-            interval: parseInt(formData.interval),
+            interval: parseInt(formData.interval) || 1,
             daysOfWeek: formData.daysOfWeek,
           },
           startDate: new Date().toISOString(),
@@ -125,7 +125,7 @@ function App() {
       currentAssignee: '',
       isRecurring: false,
       frequency: 'daily',
-      interval: 1,
+      interval: '1',
       daysOfWeek: [],
     })
     setIsAdding(false)
@@ -136,7 +136,7 @@ function App() {
   const handleEdit = async (todo: TodoItem): Promise<void> => {
     // If editing a recurring item, fetch its definition to get pattern details
     let frequency: 'daily' | 'weekly' | 'monthly' = 'daily'
-    let interval: number | string = 1
+    let interval: string = '1'
     let daysOfWeek: string[] = []
     
     if (todo.isRecurring && todo.recurrenceId) {
@@ -144,7 +144,7 @@ function App() {
         const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
         if (recDef?.pattern) {
           frequency = recDef.pattern.frequency || 'daily'
-          interval = recDef.pattern.interval || 1
+          interval = String(recDef.pattern.interval || 1)
           daysOfWeek = recDef.pattern.daysOfWeek || []
         }
       } catch (error) {
@@ -387,7 +387,7 @@ function App() {
                 <div className="recurring-options">
                   <select
                     value={formData.frequency}
-                    onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, frequency: e.target.value as 'daily' | 'weekly' | 'monthly' })}
                     className="input"
                   >
                     <option value="daily">Daily</option>
@@ -496,8 +496,8 @@ function App() {
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     e.preventDefault()
-                                    if (e.target.value !== todo.title) {
-                                      handleInlineEditSave(todo, 'title', e.target.value)
+                                    if (e.currentTarget.value !== todo.title) {
+                                      handleInlineEditSave(todo, 'title', e.currentTarget.value)
                                     } else {
                                       handleInlineEditCancel()
                                     }

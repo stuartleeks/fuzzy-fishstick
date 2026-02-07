@@ -37,7 +37,7 @@ export interface FormData {
   currentAssignee: string
   isRecurring: boolean
   frequency: 'daily' | 'weekly' | 'monthly'
-  interval: number | string
+  interval: string
   daysOfWeek: string[]
 }
 
