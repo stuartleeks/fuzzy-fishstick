@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import axios from 'axios'
 import './App.css'
 
-const API_BASE = 'http://localhost:8080/api'
+const API_BASE = '/api'
 
 function App() {
   const [todos, setTodos] = useState([])
