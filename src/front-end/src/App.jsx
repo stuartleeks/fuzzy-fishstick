@@ -13,6 +13,11 @@ function App() {
   const [inlineEditingId, setInlineEditingId] = useState(null)
   const [inlineEditField, setInlineEditField] = useState(null)
   const [showRecurringForm, setShowRecurringForm] = useState(false)
+  const [newRowData, setNewRowData] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+  })
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -275,6 +280,32 @@ function App() {
     }
   }
 
+  const handleQuickAdd = async () => {
+    if (!newRowData.title.trim()) return
+    
+    try {
+      await axios.post(`${API_BASE}/todos`, {
+        title: newRowData.title,
+        description: newRowData.description,
+        assignedTo: newRowData.assignedTo ? newRowData.assignedTo.split(',').map(a => a.trim()).filter(a => a) : [],
+        completed: false,
+      })
+      setNewRowData({ title: '', description: '', assignedTo: '' })
+      await loadTodos()
+    } catch (error) {
+      console.error('Error creating todo:', error)
+    }
+  }
+
+  const handleNewRowKeyDown = (e, field) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (field === 'assignedTo' || newRowData.title) {
+        handleQuickAdd()
+      }
+    }
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -407,145 +438,195 @@ function App() {
           )}
         </div>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="todos">
-            {(provided) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="todo-list"
-              >
-                {todos.length === 0 ? (
-                  <p className="empty-message">No items yet. Add your first to-do!</p>
-                ) : (
-                  todos.map((todo, index) => (
+        <table className="todo-table">
+          <thead>
+            <tr>
+              <th className="col-checkbox"></th>
+              <th className="col-title">Title</th>
+              <th className="col-description">Description</th>
+              <th className="col-assigned">Assigned To</th>
+              <th className="col-due">Due Date</th>
+              <th className="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="todos">
+              {(provided) => (
+                <tbody
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                >
+                  {todos.map((todo, index) => (
                     <Draggable key={todo.id} draggableId={String(todo.id)} index={index}>
                       {(provided, snapshot) => (
-                        <div
+                        <tr
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           onDoubleClick={() => handleDoubleClick(todo)}
-                          className={`todo-item ${todo.completed ? 'completed' : ''} ${
+                          className={`todo-row ${todo.completed ? 'completed' : ''} ${
                             snapshot.isDragging ? 'dragging' : ''
                           }`}
                         >
-                          <div className="todo-content">
+                          <td className="col-checkbox">
                             <input
                               type="checkbox"
                               checked={todo.completed}
                               onChange={() => handleToggleComplete(todo)}
                               className="checkbox"
                             />
-                            <div className="todo-details">
-                              {inlineEditingId === todo.id && inlineEditField === 'title' ? (
-                                <input
-                                  type="text"
-                                  defaultValue={todo.title}
-                                  autoFocus
-                                  className="inline-edit-input"
-                                  onBlur={(e) => {
+                          </td>
+                          <td className="col-title">
+                            {inlineEditingId === todo.id && inlineEditField === 'title' ? (
+                              <input
+                                type="text"
+                                defaultValue={todo.title}
+                                autoFocus
+                                className="inline-edit-input"
+                                onBlur={(e) => {
+                                  if (e.target.value !== todo.title) {
+                                    handleInlineEditSave(todo, 'title', e.target.value)
+                                  } else {
+                                    handleInlineEditCancel()
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
                                     if (e.target.value !== todo.title) {
                                       handleInlineEditSave(todo, 'title', e.target.value)
                                     } else {
                                       handleInlineEditCancel()
                                     }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault()
-                                      if (e.target.value !== todo.title) {
-                                        handleInlineEditSave(todo, 'title', e.target.value)
-                                      } else {
-                                        handleInlineEditCancel()
-                                      }
-                                    } else if (e.key === 'Escape') {
-                                      e.preventDefault()
-                                      handleInlineEditCancel()
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <h3 
-                                  className="todo-title editable"
-                                  onClick={() => !todo.completed && handleInlineEdit(todo, 'title')}
-                                >
-                                  {todo.title}
-                                  {todo.isRecurring && <span className="recurring-badge">🔄</span>}
-                                </h3>
-                              )}
-                              
-                              {inlineEditingId === todo.id && inlineEditField === 'description' ? (
-                                <textarea
-                                  defaultValue={todo.description}
-                                  autoFocus
-                                  className="inline-edit-textarea"
-                                  onBlur={(e) => {
-                                    if (e.target.value !== todo.description) {
-                                      handleInlineEditSave(todo, 'description', e.target.value)
-                                    } else {
-                                      handleInlineEditCancel()
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Escape') {
-                                      e.preventDefault()
-                                      handleInlineEditCancel()
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                todo.description && (
-                                  <p 
-                                    className="todo-description editable"
-                                    onClick={() => !todo.completed && handleInlineEdit(todo, 'description')}
-                                  >
-                                    {todo.description}
-                                  </p>
-                                )
-                              )}
-                              
-                              {todo.assignedTo && todo.assignedTo.length > 0 && (
-                                <div className="todo-assigned">
-                                  {todo.assignedTo.map((person, idx) => (
-                                    <span key={idx} className="assignee-badge">
-                                      👤 {person}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              {todo.dueDate && (
-                                <p className="todo-due">
-                                  📅 {new Date(todo.dueDate).toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="todo-actions">
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    handleInlineEditCancel()
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span 
+                                className="editable"
+                                onClick={() => !todo.completed && handleInlineEdit(todo, 'title')}
+                              >
+                                {todo.title}
+                                {todo.isRecurring && <span className="recurring-badge">🔄</span>}
+                              </span>
+                            )}
+                          </td>
+                          <td className="col-description">
+                            {inlineEditingId === todo.id && inlineEditField === 'description' ? (
+                              <input
+                                type="text"
+                                defaultValue={todo.description}
+                                autoFocus
+                                className="inline-edit-input"
+                                onBlur={(e) => {
+                                  if (e.target.value !== todo.description) {
+                                    handleInlineEditSave(todo, 'description', e.target.value)
+                                  } else {
+                                    handleInlineEditCancel()
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    handleInlineEditCancel()
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span 
+                                className="editable"
+                                onClick={() => !todo.completed && handleInlineEdit(todo, 'description')}
+                              >
+                                {todo.description}
+                              </span>
+                            )}
+                          </td>
+                          <td className="col-assigned">
+                            {todo.assignedTo && todo.assignedTo.length > 0 && (
+                              <div className="assignee-badges">
+                                {todo.assignedTo.map((person, idx) => (
+                                  <span key={idx} className="assignee-badge-small">
+                                    👤 {person}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="col-due">
+                            {todo.dueDate && (
+                              <span className="due-date">
+                                📅 {new Date(todo.dueDate).toLocaleDateString()}
+                              </span>
+                            )}
+                          </td>
+                          <td className="col-actions">
                             <button
                               onClick={() => handleEdit(todo)}
-                              className="btn btn-small"
+                              className="btn btn-icon"
                               disabled={todo.completed}
+                              title="Edit"
                             >
                               ✏️
                             </button>
                             <button
                               onClick={() => handleDelete(todo.id)}
-                              className="btn btn-small btn-danger"
+                              className="btn btn-icon btn-danger"
+                              title="Delete"
                             >
                               🗑️
                             </button>
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
                       )}
                     </Draggable>
-                  ))
-                )}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                  ))}
+                  {provided.placeholder}
+                  
+                  {/* Quick add row */}
+                  <tr className="quick-add-row">
+                    <td className="col-checkbox"></td>
+                    <td className="col-title">
+                      <input
+                        type="text"
+                        placeholder="Type to add new item..."
+                        value={newRowData.title}
+                        onChange={(e) => setNewRowData({ ...newRowData, title: e.target.value })}
+                        onKeyDown={(e) => handleNewRowKeyDown(e, 'title')}
+                        onBlur={handleQuickAdd}
+                        className="quick-add-input"
+                      />
+                    </td>
+                    <td className="col-description">
+                      <input
+                        type="text"
+                        placeholder="Description..."
+                        value={newRowData.description}
+                        onChange={(e) => setNewRowData({ ...newRowData, description: e.target.value })}
+                        onKeyDown={(e) => handleNewRowKeyDown(e, 'description')}
+                        className="quick-add-input"
+                      />
+                    </td>
+                    <td className="col-assigned">
+                      <input
+                        type="text"
+                        placeholder="Assignees..."
+                        value={newRowData.assignedTo}
+                        onChange={(e) => setNewRowData({ ...newRowData, assignedTo: e.target.value })}
+                        onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
+                        className="quick-add-input"
+                      />
+                    </td>
+                    <td className="col-due"></td>
+                    <td className="col-actions"></td>
+                  </tr>
+                </tbody>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </table>
 
         {recurringDefs.length > 0 && (
           <div className="recurring-section">
