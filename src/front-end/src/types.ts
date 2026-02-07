@@ -39,6 +39,7 @@ export interface FormData {
   frequency: 'daily' | 'weekly' | 'monthly'
   interval: string
   daysOfWeek: string[]
+  dueDate: string
 }
 
 export interface NewRowData {

@@ -11,6 +11,7 @@ function App() {
   const [recurringDefs, setRecurringDefs] = useState<RecurringItemDefinition[]>([])
   const [isAdding, setIsAdding] = useState<boolean>(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingRecurringDefId, setEditingRecurringDefId] = useState<number | null>(null)
   const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
   const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null)
   const [newRowData, setNewRowData] = useState<NewRowData>({
@@ -27,6 +28,7 @@ function App() {
     frequency: 'daily',
     interval: '1',
     daysOfWeek: [],
+    dueDate: '',
   })
 
   // Load todos and recurring definitions
@@ -57,7 +59,21 @@ function App() {
     e.preventDefault()
     
     try {
-      if (editingId) {
+      if (editingRecurringDefId) {
+        // Update recurring definition
+        await axios.put(`${API_BASE}/recurring/${editingRecurringDefId}`, {
+          title: formData.title,
+          description: formData.description,
+          assignedTo: formData.assignedTo,
+          pattern: {
+            frequency: formData.frequency,
+            interval: parseInt(formData.interval) || 1,
+            daysOfWeek: formData.daysOfWeek,
+          },
+        })
+        await loadRecurringDefs()
+        await loadTodos() // Reload todos as they may be affected
+      } else if (editingId) {
         // Check if we need to convert to/from recurring
         const currentTodo = todos.find(t => t.id === editingId)
         
@@ -76,6 +92,16 @@ function App() {
           await axios.post(`${API_BASE}/todos/${editingId}/convert-recurring`, {
             toRecurring: false,
           })
+          // Update with due date if provided
+          if (formData.dueDate) {
+            await axios.put(`${API_BASE}/todos/${editingId}`, {
+              title: formData.title,
+              description: formData.description,
+              assignedTo: formData.assignedTo,
+              completed: false,
+              dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+            })
+          }
         } else {
           // Regular update
           await axios.put(`${API_BASE}/todos/${editingId}`, {
@@ -83,6 +109,7 @@ function App() {
             description: formData.description,
             assignedTo: formData.assignedTo,
             completed: false,
+            dueDate: !formData.isRecurring && formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
           })
         }
       } else if (formData.isRecurring) {
@@ -106,6 +133,7 @@ function App() {
           description: formData.description,
           assignedTo: formData.assignedTo,
           completed: false,
+          dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
         })
       }
       
@@ -126,9 +154,11 @@ function App() {
       frequency: 'daily',
       interval: '1',
       daysOfWeek: [],
+      dueDate: '',
     })
     setIsAdding(false)
     setEditingId(null)
+    setEditingRecurringDefId(null)
   }
 
   const handleEdit = async (todo: TodoItem): Promise<void> => {
@@ -150,6 +180,9 @@ function App() {
       }
     }
     
+    // Format due date for input field (YYYY-MM-DD)
+    const dueDate = todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : ''
+    
     setFormData({
       title: todo.title,
       description: todo.description,
@@ -159,9 +192,37 @@ function App() {
       frequency: frequency,
       interval: interval,
       daysOfWeek: daysOfWeek,
+      dueDate: dueDate,
     })
     setEditingId(todo.id)
     setIsAdding(true)
+  }
+
+  const handleEditRecurringDefinition = async (todo: TodoItem): Promise<void> => {
+    if (!todo.recurrenceId) return
+    
+    try {
+      const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
+      if (!recDef) return
+      
+      // Load the recurring definition for editing
+      setFormData({
+        title: recDef.title,
+        description: recDef.description,
+        assignedTo: Array.isArray(recDef.assignedTo) ? [...recDef.assignedTo] : [],
+        currentAssignee: '',
+        isRecurring: true,
+        frequency: recDef.pattern.frequency || 'daily',
+        interval: String(recDef.pattern.interval || 1),
+        daysOfWeek: recDef.pattern.daysOfWeek || [],
+        dueDate: '',
+      })
+      setEditingRecurringDefId(todo.recurrenceId) // Store the recurring def ID
+      setEditingId(null) // Clear todo editing ID
+      setIsAdding(true)
+    } catch (error) {
+      console.error('Error loading recurring definition:', error)
+    }
   }
 
   const handleAddAssignee = (): void => {
@@ -427,10 +488,35 @@ function App() {
                 </div>
               )}
 
+              {!formData.isRecurring && (
+                <div className="due-date-section">
+                  <label htmlFor="dueDate" className="input-label">Due Date (optional):</label>
+                  <input
+                    id="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    className="input"
+                  />
+                </div>
+              )}
+
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary">
                   {editingId ? 'Update' : 'Add'}
                 </button>
+                {editingId && todos.find(t => t.id === editingId)?.isRecurring && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const todo = todos.find(t => t.id === editingId)
+                      if (todo) handleEditRecurringDefinition(todo)
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Edit Recurring Item
+                  </button>
+                )}
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
                 </button>
@@ -630,37 +716,6 @@ function App() {
             </Droppable>
           </DragDropContext>
         </table>
-
-        {recurringDefs.length > 0 && (
-          <div className="recurring-section">
-            <h2>Recurring Item Definitions</h2>
-            <div className="recurring-list">
-              {recurringDefs.map((def) => (
-                <div key={def.id} className="recurring-def">
-                  <div className="recurring-content">
-                    <h3>{def.title}</h3>
-                    <p>
-                      {def.pattern.frequency} (every {def.pattern.interval}{' '}
-                      {def.pattern.frequency === 'daily'
-                        ? 'day(s)'
-                        : def.pattern.frequency === 'weekly'
-                        ? 'week(s)'
-                        : 'month(s)'}
-                      )
-                    </p>
-                    {def.assignedTo && <p>👤 {def.assignedTo}</p>}
-                  </div>
-                  <button
-                    onClick={() => handleDeleteRecurring(def.id)}
-                    className="btn btn-small btn-danger"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
