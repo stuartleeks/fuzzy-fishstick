@@ -103,13 +103,13 @@ function App() {
             })
           }
         } else {
-          // Regular update
+          // Regular update (includes recurring instance due date edits)
           await axios.put(`${API_BASE}/todos/${editingId}`, {
             title: formData.title,
             description: formData.description,
             assignedTo: formData.assignedTo,
             completed: false,
-            dueDate: !formData.isRecurring && formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+            dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
           })
         }
       } else if (formData.isRecurring) {
@@ -159,6 +159,47 @@ function App() {
     setIsAdding(false)
     setEditingId(null)
     setEditingRecurringDefId(null)
+  }
+
+  // Calculate next instance date for a recurring item
+  const calculateNextInstanceDate = (currentDueDate: string, pattern: { frequency: string; interval: number; daysOfWeek?: string[] }): Date | null => {
+    if (!currentDueDate) return null
+    
+    const current = new Date(currentDueDate)
+    let nextDate = new Date(current)
+    
+    switch (pattern.frequency) {
+      case 'daily':
+        nextDate.setDate(current.getDate() + pattern.interval)
+        break
+      case 'weekly':
+        if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+          // For weekly with specific days, find the next matching day
+          const dayMap: { [key: string]: number } = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+          }
+          const targetDays = pattern.daysOfWeek.map(d => dayMap[d]).filter(d => d !== undefined)
+          
+          // Find next occurrence
+          for (let i = 1; i <= 14; i++) {
+            const testDate = new Date(current)
+            testDate.setDate(current.getDate() + i)
+            if (targetDays.includes(testDate.getDay())) {
+              nextDate = testDate
+              break
+            }
+          }
+        } else {
+          nextDate.setDate(current.getDate() + (7 * pattern.interval))
+        }
+        break
+      case 'monthly':
+        nextDate.setMonth(current.getMonth() + pattern.interval)
+        break
+    }
+    
+    return nextDate
   }
 
   const handleEdit = async (todo: TodoItem): Promise<void> => {
@@ -433,16 +474,24 @@ function App() {
                 )}
               </div>
               
+              {/* Recurring checkbox - disabled when editing a recurring instance */}
               <label className="checkbox-label">
                 <input
                   type="checkbox"
                   checked={formData.isRecurring}
                   onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                  disabled={editingId !== null && formData.isRecurring && !editingRecurringDefId}
                 />
                 Make this a recurring item
+                {editingId !== null && formData.isRecurring && !editingRecurringDefId && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                    (editing instance)
+                  </span>
+                )}
               </label>
 
-              {formData.isRecurring && (
+              {/* Show recurrence pattern only when creating/editing recurring definition */}
+              {formData.isRecurring && editingRecurringDefId && (
                 <div className="recurring-options">
                   <select
                     value={formData.frequency}
@@ -464,7 +513,7 @@ function App() {
                 </div>
               )}
 
-              {formData.isRecurring && formData.frequency === 'weekly' && (
+              {formData.isRecurring && editingRecurringDefId && formData.frequency === 'weekly' && (
                 <div className="days-of-week">
                   <p className="days-label">Select days:</p>
                   <div className="day-checkboxes">
@@ -488,16 +537,50 @@ function App() {
                 </div>
               )}
 
-              {!formData.isRecurring && (
+              {/* Show due date field for non-recurring items OR when editing a recurring instance */}
+              {(!formData.isRecurring || (editingId !== null && formData.isRecurring && !editingRecurringDefId)) && (
                 <div className="due-date-section">
-                  <label htmlFor="dueDate" className="input-label">Due Date (optional):</label>
+                  <label htmlFor="dueDate" className="input-label">
+                    {formData.isRecurring ? 'Instance Due Date:' : 'Due Date (optional):'}
+                  </label>
                   <input
                     id="dueDate"
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    max={(() => {
+                      // Calculate max date for recurring instances
+                      if (formData.isRecurring && editingId) {
+                        const todo = todos.find(t => t.id === editingId)
+                        if (todo?.recurrenceId) {
+                          const recDef = recurringDefs.find(d => d.id === todo.recurrenceId)
+                          if (recDef?.pattern && todo.dueDate) {
+                            const nextInstance = calculateNextInstanceDate(
+                              todo.dueDate,
+                              {
+                                frequency: recDef.pattern.frequency,
+                                interval: recDef.pattern.interval,
+                                daysOfWeek: recDef.pattern.daysOfWeek
+                              }
+                            )
+                            if (nextInstance) {
+                              // Set max to one day before next instance
+                              const maxDate = new Date(nextInstance)
+                              maxDate.setDate(maxDate.getDate() - 1)
+                              return maxDate.toISOString().split('T')[0]
+                            }
+                          }
+                        }
+                      }
+                      return undefined
+                    })()}
                     className="input"
                   />
+                  {formData.isRecurring && editingId && (
+                    <small style={{ display: 'block', marginTop: '0.25rem', color: '#666' }}>
+                      Must be before the next instance of this recurring item
+                    </small>
+                  )}
                 </div>
               )}
 
@@ -597,7 +680,6 @@ function App() {
                                 onClick={() => !todo.completed && handleInlineEdit(todo, 'title')}
                               >
                                 {todo.title}
-                                {todo.isRecurring && <span className="recurring-badge">🔄</span>}
                               </span>
                             )}
                           </td>
@@ -645,8 +727,12 @@ function App() {
                           <td className="col-due">
                             {todo.dueDate && (
                               <span className="due-date">
+                                {todo.isRecurring && <span className="recurring-badge">🔄 </span>}
                                 📅 {new Date(todo.dueDate).toLocaleDateString()}
                               </span>
+                            )}
+                            {!todo.dueDate && todo.isRecurring && (
+                              <span className="recurring-badge">🔄</span>
                             )}
                           </td>
                           <td className="col-actions">
