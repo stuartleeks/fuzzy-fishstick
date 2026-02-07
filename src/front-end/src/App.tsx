@@ -13,7 +13,6 @@ function App() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
   const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null)
-  const [showRecurringForm, setShowRecurringForm] = useState<boolean>(false)
   const [newRowData, setNewRowData] = useState<NewRowData>({
     title: '',
     description: '',
@@ -130,7 +129,6 @@ function App() {
     })
     setIsAdding(false)
     setEditingId(null)
-    setShowRecurringForm(false)
   }
 
   const handleEdit = async (todo: TodoItem): Promise<void> => {
