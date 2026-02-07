@@ -12,8 +12,11 @@ function App() {
   const [isAdding, setIsAdding] = useState<boolean>(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingRecurringDefId, setEditingRecurringDefId] = useState<number | null>(null)
+  const [originallyRecurring, setOriginallyRecurring] = useState<boolean>(false) // Track if item was originally recurring
   const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
-  const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null)
+  const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | 'assignedTo' | 'dueDate' | null>(null)
+  const [inlineAssignees, setInlineAssignees] = useState<string[]>([]) // Track assignees during inline editing
+  const [inlineAssigneeInput, setInlineAssigneeInput] = useState<string>('') // Input for new assignee
   const [newRowData, setNewRowData] = useState<NewRowData>({
     title: '',
     description: '',
@@ -159,6 +162,7 @@ function App() {
     setIsAdding(false)
     setEditingId(null)
     setEditingRecurringDefId(null)
+    setOriginallyRecurring(false)
   }
 
   // Day name to weekday number mapping for recurring patterns
@@ -208,6 +212,9 @@ function App() {
   }
 
   const handleEdit = async (todo: TodoItem): Promise<void> => {
+    // Track if the item was originally recurring
+    setOriginallyRecurring(todo.isRecurring || false)
+    
     // If editing a recurring item, fetch its definition to get pattern details
     let frequency: 'daily' | 'weekly' | 'monthly' = 'daily'
     let interval: string = '1'
@@ -301,16 +308,25 @@ function App() {
     }
   }
 
-  const handleInlineEdit = (todo: TodoItem, field: 'title' | 'description'): void => {
+  const handleInlineEdit = (todo: TodoItem, field: 'title' | 'description' | 'assignedTo' | 'dueDate'): void => {
     setInlineEditingId(todo.id)
     setInlineEditField(field)
+    // Initialize assignees for inline editing
+    if (field === 'assignedTo') {
+      setInlineAssignees(todo.assignedTo || [])
+      setInlineAssigneeInput('')
+    }
   }
 
-  const handleInlineEditSave = async (todo: TodoItem, field: 'title' | 'description', newValue: string): Promise<void> => {
+  const handleInlineEditSave = async (todo: TodoItem, field: 'title' | 'description' | 'assignedTo' | 'dueDate', newValue: string | string[]): Promise<void> => {
     try {
       const updatedTodo = {
         ...todo,
         [field]: newValue,
+      }
+      // Convert date string to ISO format if it's a due date
+      if (field === 'dueDate' && typeof newValue === 'string' && newValue) {
+        updatedTodo.dueDate = new Date(newValue).toISOString()
       }
       await axios.put(`${API_BASE}/todos/${todo.id}`, updatedTodo)
       await loadTodos()
@@ -324,6 +340,8 @@ function App() {
   const handleInlineEditCancel = (): void => {
     setInlineEditingId(null)
     setInlineEditField(null)
+    setInlineAssignees([])
+    setInlineAssigneeInput('')
   }
 
   const handleDelete = async (id: number): Promise<void> => {
@@ -485,10 +503,10 @@ function App() {
                   type="checkbox"
                   checked={formData.isRecurring}
                   onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
-                  disabled={editingId !== null && formData.isRecurring && !editingRecurringDefId}
+                  disabled={editingId !== null && originallyRecurring && !editingRecurringDefId}
                 />
                 Make this a recurring item
-                {editingId !== null && formData.isRecurring && !editingRecurringDefId && (
+                {editingId !== null && originallyRecurring && !editingRecurringDefId && (
                   <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
                     (editing instance)
                   </span>
@@ -719,25 +737,101 @@ function App() {
                             )}
                           </td>
                           <td className="col-assigned">
-                            {todo.assignedTo && todo.assignedTo.length > 0 && (
-                              <div className="assignee-badges">
-                                {todo.assignedTo.map((person, idx) => (
-                                  <span key={idx} className="assignee-badge-small">
-                                    👤 {person}
-                                  </span>
-                                ))}
+                            {inlineEditingId === todo.id && inlineEditField === 'assignedTo' ? (
+                              <div className="inline-assignee-edit">
+                                <div className="assignee-tags-inline">
+                                  {inlineAssignees.map((person, idx) => (
+                                    <span key={idx} className="assignee-tag">
+                                      👤 {person}
+                                      <button
+                                        onClick={() => setInlineAssignees(inlineAssignees.filter((_, i) => i !== idx))}
+                                        className="remove-tag"
+                                      >
+                                        ×
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Add assignee"
+                                  value={inlineAssigneeInput}
+                                  onChange={(e) => setInlineAssigneeInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && inlineAssigneeInput.trim()) {
+                                      e.preventDefault()
+                                      setInlineAssignees([...inlineAssignees, inlineAssigneeInput.trim()])
+                                      setInlineAssigneeInput('')
+                                    } else if (e.key === 'Escape') {
+                                      handleInlineEditCancel()
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      handleInlineEditSave(todo, 'assignedTo', inlineAssignees)
+                                    }, 200)
+                                  }}
+                                  autoFocus
+                                  className="inline-edit-input"
+                                  style={{ width: '100%', marginTop: '4px' }}
+                                />
+                              </div>
+                            ) : (
+                              <div 
+                                className="editable"
+                                onClick={() => !todo.completed && handleInlineEdit(todo, 'assignedTo')}
+                                style={{ cursor: todo.completed ? 'default' : 'pointer' }}
+                              >
+                                {todo.assignedTo && todo.assignedTo.length > 0 ? (
+                                  <div className="assignee-badges">
+                                    {todo.assignedTo.map((person, idx) => (
+                                      <span key={idx} className="assignee-badge-small">
+                                        👤 {person}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span style={{ color: '#999', fontSize: '0.85rem' }}>Click to add</span>
+                                )}
                               </div>
                             )}
                           </td>
                           <td className="col-due">
-                            {todo.dueDate && (
-                              <span className="due-date">
-                                {todo.isRecurring && <span className="recurring-badge">🔄 </span>}
-                                📅 {new Date(todo.dueDate).toLocaleDateString()}
-                              </span>
-                            )}
-                            {!todo.dueDate && todo.isRecurring && (
-                              <span className="recurring-badge">🔄</span>
+                            {inlineEditingId === todo.id && inlineEditField === 'dueDate' ? (
+                              <input
+                                type="date"
+                                defaultValue={todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : ''}
+                                onBlur={(e) => {
+                                  handleInlineEditSave(todo, 'dueDate', e.target.value)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleInlineEditSave(todo, 'dueDate', e.currentTarget.value)
+                                  } else if (e.key === 'Escape') {
+                                    handleInlineEditCancel()
+                                  }
+                                }}
+                                autoFocus
+                                className="inline-edit-input"
+                              />
+                            ) : (
+                              <div 
+                                className="editable"
+                                onClick={() => !todo.completed && handleInlineEdit(todo, 'dueDate')}
+                                style={{ cursor: todo.completed ? 'default' : 'pointer' }}
+                              >
+                                {todo.dueDate ? (
+                                  <span className="due-date">
+                                    {todo.isRecurring && <span className="recurring-badge">🔄 </span>}
+                                    📅 {new Date(todo.dueDate).toLocaleDateString()}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#999', fontSize: '0.85rem' }}>Click to add</span>
+                                )}
+                                {!todo.dueDate && todo.isRecurring && (
+                                  <span className="recurring-badge">🔄</span>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="col-actions">
