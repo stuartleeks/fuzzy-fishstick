@@ -189,7 +189,7 @@ body {
 }
 
 .todo-table td {
-  padding: 0.5rem 1rem;
+  padding: 0.25rem 0.5rem;
   vertical-align: middle;
 }
 
@@ -219,9 +219,14 @@ body {
   color: #888;
 }
 
-.col-actions {
-  width: 100px;
+td.col-actions {
+  min-width: 100px;
   text-align: right;
+  padding-left: 0;
+}
+
+.col-actions button {
+  display: inline-block;
 }
 
 .col-actions button {
