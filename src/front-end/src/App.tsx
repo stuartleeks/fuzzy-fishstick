@@ -161,7 +161,16 @@ function App() {
     setEditingRecurringDefId(null)
   }
 
-  // Calculate next instance date for a recurring item
+  // Day name to weekday number mapping for recurring patterns
+  const DAY_MAP: { [key: string]: number } = {
+    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+    'Thursday': 4, 'Friday': 5, 'Saturday': 6
+  }
+  
+  // Maximum days to search ahead when finding next weekly occurrence
+  const MAX_DAYS_TO_SEARCH = 14 // 2 weeks to handle all weekly patterns
+
+  // Calculate next occurrence date for a recurring item (used for validation)
   const calculateNextInstanceDate = (currentDueDate: string, pattern: { frequency: string; interval: number; daysOfWeek?: string[] }): Date | null => {
     if (!currentDueDate) return null
     
@@ -175,14 +184,10 @@ function App() {
       case 'weekly':
         if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
           // For weekly with specific days, find the next matching day
-          const dayMap: { [key: string]: number } = {
-            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-            'Thursday': 4, 'Friday': 5, 'Saturday': 6
-          }
-          const targetDays = pattern.daysOfWeek.map(d => dayMap[d]).filter(d => d !== undefined)
+          const targetDays = pattern.daysOfWeek.map(d => DAY_MAP[d]).filter(d => d !== undefined)
           
           // Find next occurrence
-          for (let i = 1; i <= 14; i++) {
+          for (let i = 1; i <= MAX_DAYS_TO_SEARCH; i++) {
             const testDate = new Date(current)
             testDate.setDate(current.getDate() + i)
             if (targetDays.includes(testDate.getDay())) {
