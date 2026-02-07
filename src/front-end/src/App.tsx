@@ -1,24 +1,25 @@
 import { useState, useEffect } from 'react'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import axios from 'axios'
 import './App.css'
+import type { TodoItem, RecurringItemDefinition, FormData, NewRowData, ReorderItem } from './types'
 
 const API_BASE = '/api'
 
 function App() {
-  const [todos, setTodos] = useState([])
-  const [recurringDefs, setRecurringDefs] = useState([])
-  const [isAdding, setIsAdding] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [inlineEditingId, setInlineEditingId] = useState(null)
-  const [inlineEditField, setInlineEditField] = useState(null)
-  const [showRecurringForm, setShowRecurringForm] = useState(false)
-  const [newRowData, setNewRowData] = useState({
+  const [todos, setTodos] = useState<TodoItem[]>([])
+  const [recurringDefs, setRecurringDefs] = useState<RecurringItemDefinition[]>([])
+  const [isAdding, setIsAdding] = useState<boolean>(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [inlineEditingId, setInlineEditingId] = useState<number | null>(null)
+  const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | null>(null)
+  const [showRecurringForm, setShowRecurringForm] = useState<boolean>(false)
+  const [newRowData, setNewRowData] = useState<NewRowData>({
     title: '',
     description: '',
     assignedTo: '',
   })
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
     assignedTo: [],
@@ -35,25 +36,25 @@ function App() {
     loadRecurringDefs()
   }, [])
 
-  const loadTodos = async () => {
+  const loadTodos = async (): Promise<void> => {
     try {
-      const response = await axios.get(`${API_BASE}/todos`)
+      const response = await axios.get<TodoItem[]>(`${API_BASE}/todos`)
       setTodos(response.data || [])
     } catch (error) {
       console.error('Error loading todos:', error)
     }
   }
 
-  const loadRecurringDefs = async () => {
+  const loadRecurringDefs = async (): Promise<void> => {
     try {
-      const response = await axios.get(`${API_BASE}/recurring`)
+      const response = await axios.get<RecurringItemDefinition[]>(`${API_BASE}/recurring`)
       setRecurringDefs(response.data || [])
     } catch (error) {
       console.error('Error loading recurring definitions:', error)
     }
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
     
     try {
@@ -132,16 +133,16 @@ function App() {
     setShowRecurringForm(false)
   }
 
-  const handleEdit = async (todo) => {
+  const handleEdit = async (todo: TodoItem): Promise<void> => {
     // If editing a recurring item, fetch its definition to get pattern details
-    let frequency = 'daily'
-    let interval = 1
-    let daysOfWeek = []
+    let frequency: 'daily' | 'weekly' | 'monthly' = 'daily'
+    let interval: number | string = 1
+    let daysOfWeek: string[] = []
     
     if (todo.isRecurring && todo.recurrenceId) {
       try {
         const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
-        if (recDef && recDef.pattern) {
+        if (recDef?.pattern) {
           frequency = recDef.pattern.frequency || 'daily'
           interval = recDef.pattern.interval || 1
           daysOfWeek = recDef.pattern.daysOfWeek || []
@@ -165,7 +166,7 @@ function App() {
     setIsAdding(true)
   }
 
-  const handleAddAssignee = () => {
+  const handleAddAssignee = (): void => {
     if (formData.currentAssignee.trim()) {
       setFormData({
         ...formData,
@@ -175,32 +176,32 @@ function App() {
     }
   }
 
-  const handleRemoveAssignee = (index) => {
+  const handleRemoveAssignee = (index: number): void => {
     setFormData({
       ...formData,
       assignedTo: formData.assignedTo.filter((_, i) => i !== index),
     })
   }
 
-  const handleAssigneeKeyDown = (e) => {
+  const handleAssigneeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddAssignee()
     }
   }
 
-  const handleDoubleClick = (todo) => {
+  const handleDoubleClick = (todo: TodoItem): void => {
     if (!todo.completed) {
       handleEdit(todo)
     }
   }
 
-  const handleInlineEdit = (todo, field, value) => {
+  const handleInlineEdit = (todo: TodoItem, field: 'title' | 'description'): void => {
     setInlineEditingId(todo.id)
     setInlineEditField(field)
   }
 
-  const handleInlineEditSave = async (todo, field, newValue) => {
+  const handleInlineEditSave = async (todo: TodoItem, field: 'title' | 'description', newValue: string): Promise<void> => {
     try {
       const updatedTodo = {
         ...todo,
@@ -215,12 +216,12 @@ function App() {
     }
   }
 
-  const handleInlineEditCancel = () => {
+  const handleInlineEditCancel = (): void => {
     setInlineEditingId(null)
     setInlineEditField(null)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number): Promise<void> => {
     if (!window.confirm('Are you sure you want to delete this item?')) return
     
     try {
@@ -231,7 +232,7 @@ function App() {
     }
   }
 
-  const handleToggleComplete = async (todo) => {
+  const handleToggleComplete = async (todo: TodoItem): Promise<void> => {
     try {
       await axios.put(`${API_BASE}/todos/${todo.id}`, {
         ...todo,
@@ -243,7 +244,7 @@ function App() {
     }
   }
 
-  const handleDragEnd = async (result) => {
+  const handleDragEnd = async (result: DropResult): Promise<void> => {
     if (!result.destination) return
 
     const items = Array.from(todos)
@@ -254,7 +255,7 @@ function App() {
     setTodos(items)
 
     // Send reorder request to backend
-    const reorderData = items.map((item, index) => ({
+    const reorderData: ReorderItem[] = items.map((item, index) => ({
       id: item.id,
       position: index,
     }))
@@ -268,7 +269,7 @@ function App() {
     }
   }
 
-  const handleDeleteRecurring = async (id) => {
+  const handleDeleteRecurring = async (id: number): Promise<void> => {
     if (!window.confirm('Delete this recurring item definition?')) return
     
     try {
@@ -280,7 +281,7 @@ function App() {
     }
   }
 
-  const handleQuickAdd = async () => {
+  const handleQuickAdd = async (): Promise<void> => {
     if (!newRowData.title.trim()) return
     
     try {
@@ -297,11 +298,11 @@ function App() {
     }
   }
 
-  const handleNewRowKeyDown = (e, field) => {
+  const handleNewRowKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string): void => {
     if (e.key === 'Enter') {
       e.preventDefault()
       // Check if title has content before submitting
-      const titleValue = field === 'title' ? e.target.value : newRowData.title
+      const titleValue = field === 'title' ? e.currentTarget.value : newRowData.title
       if (titleValue.trim()) {
         handleQuickAdd()
       }
