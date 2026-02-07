@@ -300,7 +300,9 @@ function App() {
   const handleNewRowKeyDown = (e, field) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (field === 'assignedTo' || newRowData.title) {
+      // Check if title has content before submitting
+      const titleValue = field === 'title' ? e.target.value : newRowData.title
+      if (titleValue.trim()) {
         handleQuickAdd()
       }
     }
@@ -606,6 +608,7 @@ function App() {
                         value={newRowData.description}
                         onChange={(e) => setNewRowData({ ...newRowData, description: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'description')}
+                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
@@ -616,6 +619,7 @@ function App() {
                         value={newRowData.assignedTo}
                         onChange={(e) => setNewRowData({ ...newRowData, assignedTo: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
+                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
