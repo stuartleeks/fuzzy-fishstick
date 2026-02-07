@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./src/back-end
+      dockerfile: Dockerfile
+    container_name: fuzzy-fishstick-backend
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - fuzzy-fishstick-network
+
+  frontend:
+    build:
+      context: ./src/front-end
+      dockerfile: Dockerfile
+    container_name: fuzzy-fishstick-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - fuzzy-fishstick-network
+
+networks:
+  fuzzy-fishstick-network:
+    driver: bridge

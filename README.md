@@ -159,6 +159,69 @@ The production build will be in the `src/front-end/dist` directory.
 - Delete a recurring definition to unlink it from existing items
 - Edit a recurring definition to update all future instances
 
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
+The easiest way to run the application with Docker:
+
+```bash
+# Build and start both services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+The application will be available at:
+- Frontend: http://localhost
+- Backend API: http://localhost:8080
+
+### Using Makefile
+
+```bash
+# Build Docker images
+make docker-build-all
+
+# Or build individually
+make docker-build-backend
+make docker-build-frontend
+
+# Run containers
+make docker-run-backend
+make docker-run-frontend
+```
+
+### Manual Docker Commands
+
+```bash
+# Build images
+docker build -t fuzzy-fishstick-backend:latest src/back-end
+docker build -t fuzzy-fishstick-frontend:latest src/front-end
+
+# Run backend
+docker run -d -p 8080:8080 --name backend fuzzy-fishstick-backend:latest
+
+# Run frontend (linked to backend)
+docker run -d -p 80:80 --name frontend --link backend:backend fuzzy-fishstick-frontend:latest
+```
+
+## CI/CD
+
+The project includes GitHub Actions workflows for:
+
+- **Pull Requests**: Build and validate Docker images
+- **Main Branch**: Build, tag, and push images to GitHub Container Registry (GHCR)
+- **Dev Container**: Build and push devcontainer image for consistent development environments
+
+Published images:
+- `ghcr.io/stuartleeks/fuzzy-fishstick/backend:latest`
+- `ghcr.io/stuartleeks/fuzzy-fishstick/frontend:latest`
+- `ghcr.io/stuartleeks/fuzzy-fishstick/devcontainer:latest`
+
 ## License
 
 MIT
