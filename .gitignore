@@ -9,9 +9,9 @@
 go.work
 
 # Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.env
+src/front-end/node_modules/
+src/front-end/dist/
+src/front-end/.env
 
 # Temporary files
 /tmp/

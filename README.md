@@ -11,6 +11,16 @@ A To-Do List application with a React frontend and Go backend API.
 - 🔀 Drag and drop to reorder items
 - 📱 Responsive design
 
+## Project Structure
+
+```
+.
+├── src/
+│   ├── back-end/      # Go API backend
+│   └── front-end/     # React frontend
+└── .devcontainer/     # Dev container configuration
+```
+
 ## Architecture
 
 - **Backend**: Go API with RESTful endpoints
@@ -23,13 +33,26 @@ A To-Do List application with a React frontend and Go backend API.
 - Node.js 24.x or higher
 - npm 11.x or higher
 
+**Or use the Dev Container:**
+- Docker
+- VS Code with Remote - Containers extension
+
 ## Getting Started
 
-### Running the Backend API
+### Option 1: Using Dev Container (Recommended)
 
-1. Navigate to the project root:
+1. Open the project in VS Code
+2. Click "Reopen in Container" when prompted (or use Command Palette: "Remote-Containers: Reopen in Container")
+3. The container will automatically install dependencies
+4. Run the backend and frontend as described below
+
+### Option 2: Local Development
+
+#### Running the Backend API
+
+1. Navigate to the backend directory:
    ```bash
-   cd /path/to/fuzzy-fishstick
+   cd src/back-end
    ```
 
 2. Install Go dependencies:
@@ -44,11 +67,11 @@ A To-Do List application with a React frontend and Go backend API.
 
    The API will start on `http://localhost:8080`
 
-### Running the Frontend
+#### Running the Frontend
 
 1. Navigate to the frontend directory:
    ```bash
-   cd frontend
+   cd src/front-end
    ```
 
 2. Install dependencies:
@@ -88,17 +111,18 @@ A To-Do List application with a React frontend and Go backend API.
 
 #### Backend
 ```bash
+cd src/back-end
 go build -o todo-api main.go
 ./todo-api
 ```
 
 #### Frontend
 ```bash
-cd frontend
+cd src/front-end
 npm run build
 ```
 
-The production build will be in the `frontend/dist` directory.
+The production build will be in the `src/front-end/dist` directory.
 
 ## Usage
 
