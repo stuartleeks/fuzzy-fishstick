@@ -99,7 +99,7 @@ function App() {
               description: formData.description,
               assignedTo: formData.assignedTo,
               completed: false,
-              dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+              dueDate: new Date(formData.dueDate).toISOString(),
             })
           }
         } else {
@@ -505,18 +505,18 @@ function App() {
                 <button type="submit" className="btn btn-primary">
                   {editingId ? 'Update' : 'Add'}
                 </button>
-                {editingId && todos.find(t => t.id === editingId)?.isRecurring && (
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      const todo = todos.find(t => t.id === editingId)
-                      if (todo) handleEditRecurringDefinition(todo)
-                    }}
-                    className="btn btn-secondary"
-                  >
-                    Edit Recurring Item
-                  </button>
-                )}
+                {editingId && (() => {
+                  const todo = todos.find(t => t.id === editingId)
+                  return todo?.isRecurring && (
+                    <button 
+                      type="button" 
+                      onClick={() => handleEditRecurringDefinition(todo)}
+                      className="btn btn-secondary"
+                    >
+                      Edit Recurring Item
+                    </button>
+                  )
+                })()}
                 <button type="button" onClick={resetForm} className="btn btn-secondary">
                   Cancel
                 </button>
