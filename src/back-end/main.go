@@ -15,8 +15,9 @@ import (
 
 // RecurrencePattern defines how a to-do item recurs
 type RecurrencePattern struct {
-	Frequency string `json:"frequency"` // "daily", "weekly", "monthly"
-	Interval  int    `json:"interval"`  // Every N days/weeks/months
+	Frequency  string   `json:"frequency"`  // "daily", "weekly", "monthly"
+	Interval   int      `json:"interval"`   // Every N days/weeks/months
+	DaysOfWeek []string `json:"daysOfWeek"` // For weekly: ["Monday", "Wednesday", etc.]
 }
 
 // TodoItem represents a to-do item
@@ -73,6 +74,7 @@ func main() {
 	r.HandleFunc("/api/todos/{id}", updateTodo).Methods("PUT")
 	r.HandleFunc("/api/todos/{id}", deleteTodo).Methods("DELETE")
 	r.HandleFunc("/api/todos/reorder", reorderTodos).Methods("POST")
+	r.HandleFunc("/api/todos/{id}/convert-recurring", convertTodoRecurring).Methods("POST")
 
 	// Recurring item routes
 	r.HandleFunc("/api/recurring", getRecurringDefs).Methods("GET")
@@ -232,6 +234,70 @@ func reorderTodos(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// convertTodoRecurring converts a todo to/from recurring
+func convertTodoRecurring(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var request struct {
+		ToRecurring bool              `json:"toRecurring"`
+		Pattern     RecurrencePattern `json:"pattern"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	todo, exists := store.todos[id]
+	if !exists {
+		http.Error(w, "Todo not found", http.StatusNotFound)
+		return
+	}
+
+	if request.ToRecurring {
+		// Convert to recurring item
+		// Create a recurring definition
+		def := &RecurringItemDefinition{
+			ID:          store.nextRecurringID,
+			Title:       todo.Title,
+			Description: todo.Description,
+			AssignedTo:  todo.AssignedTo,
+			Pattern:     request.Pattern,
+			StartDate:   time.Now(),
+			CreatedAt:   time.Now(),
+		}
+		store.nextRecurringID++
+		store.recurringDefs[def.ID] = def
+
+		// Update the todo to be recurring
+		todo.IsRecurring = true
+		todo.RecurrenceID = &def.ID
+		nextDueDate := calculateNextDueDate(def.StartDate, def.Pattern)
+		todo.DueDate = &nextDueDate
+	} else {
+		// Convert from recurring to one-off
+		todo.IsRecurring = false
+		if todo.RecurrenceID != nil {
+			// Optionally delete the recurring definition if this was the only instance
+			// For now, just unlink it
+			todo.RecurrenceID = nil
+		}
+		// Keep the current due date or clear it
+		todo.DueDate = nil
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(todo)
+}
+
 // getRecurringDefs returns all recurring item definitions
 func getRecurringDefs(w http.ResponseWriter, r *http.Request) {
 	store.mu.RLock()
@@ -361,6 +427,11 @@ func calculateNextDueDate(startDate time.Time, pattern RecurrencePattern) time.T
 	now := time.Now()
 	nextDate := startDate
 
+	// For weekly recurrence with specific days of week
+	if pattern.Frequency == "weekly" && len(pattern.DaysOfWeek) > 0 {
+		return calculateNextWeeklyDate(now, pattern.DaysOfWeek, pattern.Interval)
+	}
+
 	for nextDate.Before(now) {
 		switch pattern.Frequency {
 		case "daily":
@@ -373,4 +444,54 @@ func calculateNextDueDate(startDate time.Time, pattern RecurrencePattern) time.T
 	}
 
 	return nextDate
+}
+
+// calculateNextWeeklyDate finds the next occurrence based on specific days of week
+func calculateNextWeeklyDate(from time.Time, daysOfWeek []string, interval int) time.Time {
+	// Map day names to time.Weekday
+	dayMap := map[string]time.Weekday{
+		"Sunday":    time.Sunday,
+		"Monday":    time.Monday,
+		"Tuesday":   time.Tuesday,
+		"Wednesday": time.Wednesday,
+		"Thursday":  time.Thursday,
+		"Friday":    time.Friday,
+		"Saturday":  time.Saturday,
+	}
+
+	// Convert string days to weekday numbers
+	targetDays := make(map[time.Weekday]bool)
+	for _, day := range daysOfWeek {
+		if wd, ok := dayMap[day]; ok {
+			targetDays[wd] = true
+		}
+	}
+
+	if len(targetDays) == 0 {
+		// Fallback to regular weekly if no valid days
+		return from.AddDate(0, 0, 7*interval)
+	}
+
+	// Start from tomorrow
+	nextDate := from.AddDate(0, 0, 1)
+	currentWeekStart := from
+
+	for {
+		// Check if we're in a valid week (every interval weeks)
+		weeksSinceStart := int(nextDate.Sub(currentWeekStart).Hours() / (24 * 7))
+		if weeksSinceStart%interval == 0 {
+			// Check if this day is in our target days
+			if targetDays[nextDate.Weekday()] {
+				return nextDate
+			}
+		}
+
+		// Move to next day
+		nextDate = nextDate.AddDate(0, 0, 1)
+
+		// Safety check: don't loop forever
+		if nextDate.Sub(from).Hours() > 24*365 {
+			return from.AddDate(0, 0, 7*interval)
+		}
+	}
 }

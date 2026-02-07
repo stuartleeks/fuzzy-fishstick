@@ -21,6 +21,7 @@ function App() {
     isRecurring: false,
     frequency: 'daily',
     interval: 1,
+    daysOfWeek: [],
   })
 
   // Load todos and recurring definitions
@@ -51,8 +52,36 @@ function App() {
     e.preventDefault()
     
     try {
-      if (formData.isRecurring) {
-        // Create recurring item
+      if (editingId) {
+        // Check if we need to convert to/from recurring
+        const currentTodo = todos.find(t => t.id === editingId)
+        
+        if (formData.isRecurring && !currentTodo?.isRecurring) {
+          // Convert to recurring
+          await axios.post(`${API_BASE}/todos/${editingId}/convert-recurring`, {
+            toRecurring: true,
+            pattern: {
+              frequency: formData.frequency,
+              interval: parseInt(formData.interval),
+              daysOfWeek: formData.daysOfWeek,
+            },
+          })
+        } else if (!formData.isRecurring && currentTodo?.isRecurring) {
+          // Convert from recurring to one-off
+          await axios.post(`${API_BASE}/todos/${editingId}/convert-recurring`, {
+            toRecurring: false,
+          })
+        } else {
+          // Regular update
+          await axios.put(`${API_BASE}/todos/${editingId}`, {
+            title: formData.title,
+            description: formData.description,
+            assignedTo: formData.assignedTo,
+            completed: false,
+          })
+        }
+      } else if (formData.isRecurring) {
+        // Create new recurring item
         await axios.post(`${API_BASE}/recurring`, {
           title: formData.title,
           description: formData.description,
@@ -60,18 +89,11 @@ function App() {
           pattern: {
             frequency: formData.frequency,
             interval: parseInt(formData.interval),
+            daysOfWeek: formData.daysOfWeek,
           },
           startDate: new Date().toISOString(),
         })
         await loadRecurringDefs()
-      } else if (editingId) {
-        // Update existing todo
-        await axios.put(`${API_BASE}/todos/${editingId}`, {
-          title: formData.title,
-          description: formData.description,
-          assignedTo: formData.assignedTo,
-          completed: false,
-        })
       } else {
         // Create new one-off todo
         await axios.post(`${API_BASE}/todos`, {
@@ -98,6 +120,7 @@ function App() {
       isRecurring: false,
       frequency: 'daily',
       interval: 1,
+      daysOfWeek: [],
     })
     setIsAdding(false)
     setEditingId(null)
@@ -110,9 +133,10 @@ function App() {
       description: todo.description,
       assignedTo: Array.isArray(todo.assignedTo) ? [...todo.assignedTo] : [],
       currentAssignee: '',
-      isRecurring: false,
+      isRecurring: todo.isRecurring || false,
       frequency: 'daily',
       interval: 1,
+      daysOfWeek: [],
     })
     setEditingId(todo.id)
     setIsAdding(true)
@@ -298,18 +322,16 @@ function App() {
                 )}
               </div>
               
-              {!editingId && (
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={formData.isRecurring}
-                    onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
-                  />
-                  Make this a recurring item
-                </label>
-              )}
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.isRecurring}
+                  onChange={(e) => setFormData({ ...formData, isRecurring: e.target.checked })}
+                />
+                Make this a recurring item
+              </label>
 
-              {formData.isRecurring && !editingId && (
+              {formData.isRecurring && (
                 <div className="recurring-options">
                   <select
                     value={formData.frequency}
@@ -328,6 +350,30 @@ function App() {
                     onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
                     className="input"
                   />
+                </div>
+              )}
+
+              {formData.isRecurring && formData.frequency === 'weekly' && (
+                <div className="days-of-week">
+                  <p className="days-label">Select days:</p>
+                  <div className="day-checkboxes">
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                      <label key={day} className="day-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={formData.daysOfWeek.includes(day)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, daysOfWeek: [...formData.daysOfWeek, day] })
+                            } else {
+                              setFormData({ ...formData, daysOfWeek: formData.daysOfWeek.filter(d => d !== day) })
+                            }
+                          }}
+                        />
+                        {day.substring(0, 3)}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
