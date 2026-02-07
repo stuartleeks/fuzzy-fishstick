@@ -24,7 +24,7 @@ type TodoItem struct {
 	ID              int                `json:"id"`
 	Title           string             `json:"title"`
 	Description     string             `json:"description"`
-	AssignedTo      string             `json:"assignedTo"`
+	AssignedTo      []string           `json:"assignedTo"`
 	Completed       bool               `json:"completed"`
 	Position        int                `json:"position"`
 	IsRecurring     bool               `json:"isRecurring"`
@@ -39,7 +39,7 @@ type RecurringItemDefinition struct {
 	ID          int                `json:"id"`
 	Title       string             `json:"title"`
 	Description string             `json:"description"`
-	AssignedTo  string             `json:"assignedTo"`
+	AssignedTo  []string           `json:"assignedTo"`
 	Pattern     RecurrencePattern  `json:"pattern"`
 	StartDate   time.Time          `json:"startDate"`
 	CreatedAt   time.Time          `json:"createdAt"`

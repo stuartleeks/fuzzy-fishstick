@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import axios from 'axios'
 import './App.css'
@@ -10,11 +10,14 @@ function App() {
   const [recurringDefs, setRecurringDefs] = useState([])
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [inlineEditingId, setInlineEditingId] = useState(null)
+  const [inlineEditField, setInlineEditField] = useState(null)
   const [showRecurringForm, setShowRecurringForm] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    assignedTo: '',
+    assignedTo: [],
+    currentAssignee: '',
     isRecurring: false,
     frequency: 'daily',
     interval: 1,
@@ -90,7 +93,8 @@ function App() {
     setFormData({
       title: '',
       description: '',
-      assignedTo: '',
+      assignedTo: [],
+      currentAssignee: '',
       isRecurring: false,
       frequency: 'daily',
       interval: 1,
@@ -104,13 +108,69 @@ function App() {
     setFormData({
       title: todo.title,
       description: todo.description,
-      assignedTo: todo.assignedTo,
+      assignedTo: Array.isArray(todo.assignedTo) ? [...todo.assignedTo] : [],
+      currentAssignee: '',
       isRecurring: false,
       frequency: 'daily',
       interval: 1,
     })
     setEditingId(todo.id)
     setIsAdding(true)
+  }
+
+  const handleAddAssignee = () => {
+    if (formData.currentAssignee.trim()) {
+      setFormData({
+        ...formData,
+        assignedTo: [...formData.assignedTo, formData.currentAssignee.trim()],
+        currentAssignee: '',
+      })
+    }
+  }
+
+  const handleRemoveAssignee = (index) => {
+    setFormData({
+      ...formData,
+      assignedTo: formData.assignedTo.filter((_, i) => i !== index),
+    })
+  }
+
+  const handleAssigneeKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddAssignee()
+    }
+  }
+
+  const handleDoubleClick = (todo) => {
+    if (!todo.completed) {
+      handleEdit(todo)
+    }
+  }
+
+  const handleInlineEdit = (todo, field, value) => {
+    setInlineEditingId(todo.id)
+    setInlineEditField(field)
+  }
+
+  const handleInlineEditSave = async (todo, field, newValue) => {
+    try {
+      const updatedTodo = {
+        ...todo,
+        [field]: newValue,
+      }
+      await axios.put(`${API_BASE}/todos/${todo.id}`, updatedTodo)
+      await loadTodos()
+      setInlineEditingId(null)
+      setInlineEditField(null)
+    } catch (error) {
+      console.error('Error updating todo:', error)
+    }
+  }
+
+  const handleInlineEditCancel = () => {
+    setInlineEditingId(null)
+    setInlineEditField(null)
   }
 
   const handleDelete = async (id) => {
@@ -201,13 +261,42 @@ function App() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="input textarea"
               />
-              <input
-                type="text"
-                placeholder="Assigned to (optional)"
-                value={formData.assignedTo}
-                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                className="input"
-              />
+              
+              <div className="assignee-section">
+                <div className="assignee-input-group">
+                  <input
+                    type="text"
+                    placeholder="Add assignee (press Enter)"
+                    value={formData.currentAssignee}
+                    onChange={(e) => setFormData({ ...formData, currentAssignee: e.target.value })}
+                    onKeyPress={handleAssigneeKeyPress}
+                    className="input"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddAssignee}
+                    className="btn btn-secondary btn-small"
+                  >
+                    + Add
+                  </button>
+                </div>
+                {formData.assignedTo.length > 0 && (
+                  <div className="assignee-tags">
+                    {formData.assignedTo.map((person, index) => (
+                      <span key={index} className="assignee-tag">
+                        👤 {person}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAssignee(index)}
+                          className="remove-tag"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               
               {!editingId && (
                 <label className="checkbox-label">
@@ -272,6 +361,7 @@ function App() {
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
+                          onDoubleClick={() => handleDoubleClick(todo)}
                           className={`todo-item ${todo.completed ? 'completed' : ''} ${
                             snapshot.isDragging ? 'dragging' : ''
                           }`}
@@ -284,15 +374,74 @@ function App() {
                               className="checkbox"
                             />
                             <div className="todo-details">
-                              <h3 className="todo-title">
-                                {todo.title}
-                                {todo.isRecurring && <span className="recurring-badge">🔄</span>}
-                              </h3>
-                              {todo.description && (
-                                <p className="todo-description">{todo.description}</p>
+                              {inlineEditingId === todo.id && inlineEditField === 'title' ? (
+                                <input
+                                  type="text"
+                                  defaultValue={todo.title}
+                                  autoFocus
+                                  className="inline-edit-input"
+                                  onBlur={(e) => {
+                                    if (e.target.value !== todo.title) {
+                                      handleInlineEditSave(todo, 'title', e.target.value)
+                                    } else {
+                                      handleInlineEditCancel()
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.target.blur()
+                                    } else if (e.key === 'Escape') {
+                                      handleInlineEditCancel()
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <h3 
+                                  className="todo-title editable"
+                                  onClick={() => !todo.completed && handleInlineEdit(todo, 'title')}
+                                >
+                                  {todo.title}
+                                  {todo.isRecurring && <span className="recurring-badge">🔄</span>}
+                                </h3>
                               )}
-                              {todo.assignedTo && (
-                                <p className="todo-assigned">👤 {todo.assignedTo}</p>
+                              
+                              {inlineEditingId === todo.id && inlineEditField === 'description' ? (
+                                <textarea
+                                  defaultValue={todo.description}
+                                  autoFocus
+                                  className="inline-edit-textarea"
+                                  onBlur={(e) => {
+                                    if (e.target.value !== todo.description) {
+                                      handleInlineEditSave(todo, 'description', e.target.value)
+                                    } else {
+                                      handleInlineEditCancel()
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                      handleInlineEditCancel()
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                todo.description && (
+                                  <p 
+                                    className="todo-description editable"
+                                    onClick={() => !todo.completed && handleInlineEdit(todo, 'description')}
+                                  >
+                                    {todo.description}
+                                  </p>
+                                )
+                              )}
+                              
+                              {todo.assignedTo && todo.assignedTo.length > 0 && (
+                                <div className="todo-assigned">
+                                  {todo.assignedTo.map((person, idx) => (
+                                    <span key={idx} className="assignee-badge">
+                                      👤 {person}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                               {todo.dueDate && (
                                 <p className="todo-due">
