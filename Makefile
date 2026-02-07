@@ -1,4 +1,4 @@
-.PHONY: frontend backend install-frontend run
+.PHONY: frontend backend install-frontend run docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -18,3 +18,20 @@ backend: ## Run the back-end server
 
 run: ## Run both front-end and back-end concurrently
 	$(MAKE) backend & $(MAKE) frontend
+
+docker-build-backend: ## Build backend Docker image
+	docker build -t fuzzy-fishstick-backend:latest src/back-end
+
+docker-build-frontend: ## Build frontend Docker image
+	docker build -t fuzzy-fishstick-frontend:latest src/front-end
+
+docker-build-all: ## Build all Docker images
+	$(MAKE) docker-build-backend
+	$(MAKE) docker-build-frontend
+
+docker-run-backend: ## Run backend Docker container
+	docker run -p 8080:8080 --name fuzzy-fishstick-backend fuzzy-fishstick-backend:latest
+
+docker-run-frontend: ## Run frontend Docker container
+	docker run -p 80:80 --name fuzzy-fishstick-frontend --link fuzzy-fishstick-backend:backend fuzzy-fishstick-frontend:latest
+
