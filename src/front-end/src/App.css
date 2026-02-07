@@ -202,12 +202,14 @@ body {
 .col-title {
   width: 25%;
   font-weight: 500;
+  padding: 0 !important; /* Remove padding so editable can fill */
 }
 
 .col-description {
   width: 30%;
   color: #666;
   font-size: 0.9rem;
+  padding: 0 !important; /* Remove padding so editable can fill */
 }
 
 .col-assigned {
@@ -242,9 +244,12 @@ td.col-actions {
 
 .editable {
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 0.5rem;
   border-radius: 3px;
   transition: background-color 0.2s;
+  display: block;
+  width: 100%;
+  min-height: 2rem; /* Ensure clickable area even with no text */
 }
 
 .editable:hover {
