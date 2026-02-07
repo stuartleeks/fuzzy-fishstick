@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -46,18 +47,18 @@ type RecurringItemDefinition struct {
 
 // Store holds all data
 type Store struct {
-	mu                  sync.RWMutex
-	todos               map[int]*TodoItem
-	recurringDefs       map[int]*RecurringItemDefinition
-	nextTodoID          int
-	nextRecurringDefID  int
+	mu                 sync.RWMutex
+	todos              map[int]*TodoItem
+	recurringDefs      map[int]*RecurringItemDefinition
+	nextTodoID         int
+	nextRecurringID    int
 }
 
 var store = &Store{
-	todos:         make(map[int]*TodoItem),
-	recurringDefs: make(map[int]*RecurringItemDefinition),
-	nextTodoID:    1,
-	nextRecurringDefID: 1,
+	todos:           make(map[int]*TodoItem),
+	recurringDefs:   make(map[int]*RecurringItemDefinition),
+	nextTodoID:      1,
+	nextRecurringID: 1,
 }
 
 func main() {
@@ -110,13 +111,9 @@ func getTodos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort by position
-	for i := 0; i < len(todos)-1; i++ {
-		for j := i + 1; j < len(todos); j++ {
-			if todos[i].Position > todos[j].Position {
-				todos[i], todos[j] = todos[j], todos[i]
-			}
-		}
-	}
+	sort.Slice(todos, func(i, j int) bool {
+		return todos[i].Position < todos[j].Position
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(todos)
@@ -260,8 +257,8 @@ func createRecurringDef(w http.ResponseWriter, r *http.Request) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	def.ID = store.nextRecurringDefID
-	store.nextRecurringDefID++
+	def.ID = store.nextRecurringID
+	store.nextRecurringID++
 	def.CreatedAt = time.Now()
 
 	store.recurringDefs[def.ID] = &def
