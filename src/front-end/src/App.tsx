@@ -173,6 +173,9 @@ function App() {
   
   // Maximum days to search ahead when finding next weekly occurrence
   const MAX_DAYS_TO_SEARCH = 14 // 2 weeks to handle all weekly patterns
+  
+  // Delay before saving inline edits on blur (allows remove button clicks to process first)
+  const INLINE_EDIT_BLUR_DELAY = 200 // milliseconds
 
   // Calculate next occurrence date for a recurring item (used for validation)
   const calculateNextInstanceDate = (currentDueDate: string, pattern: { frequency: string; interval: number; daysOfWeek?: string[] }): Date | null => {
@@ -324,9 +327,18 @@ function App() {
         ...todo,
         [field]: newValue,
       }
-      // Convert date string to ISO format if it's a due date
-      if (field === 'dueDate' && typeof newValue === 'string' && newValue) {
-        updatedTodo.dueDate = new Date(newValue).toISOString()
+      // Convert and validate date string to ISO format if it's a due date
+      if (field === 'dueDate' && typeof newValue === 'string') {
+        if (newValue) {
+          const date = new Date(newValue)
+          if (isNaN(date.getTime())) {
+            console.error('Invalid date:', newValue)
+            return // Don't save invalid dates
+          }
+          updatedTodo.dueDate = date.toISOString()
+        } else {
+          updatedTodo.dueDate = null // Clear the due date if empty
+        }
       }
       await axios.put(`${API_BASE}/todos/${todo.id}`, updatedTodo)
       await loadTodos()
@@ -769,7 +781,7 @@ function App() {
                                   onBlur={() => {
                                     setTimeout(() => {
                                       handleInlineEditSave(todo, 'assignedTo', inlineAssignees)
-                                    }, 200)
+                                    }, INLINE_EDIT_BLUR_DELAY)
                                   }}
                                   autoFocus
                                   className="inline-edit-input"
