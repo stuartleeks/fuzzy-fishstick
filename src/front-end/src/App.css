@@ -456,7 +456,6 @@ body {
   cursor: pointer;
 }
 
-.day-checkbox-label input[type="checkbox"]:checked + span,
 .day-checkbox-label:has(input[type="checkbox"]:checked) {
   background: #667eea;
   color: white;

@@ -127,16 +127,34 @@ function App() {
     setShowRecurringForm(false)
   }
 
-  const handleEdit = (todo) => {
+  const handleEdit = async (todo) => {
+    // If editing a recurring item, fetch its definition to get pattern details
+    let frequency = 'daily'
+    let interval = 1
+    let daysOfWeek = []
+    
+    if (todo.isRecurring && todo.recurrenceId) {
+      try {
+        const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
+        if (recDef && recDef.pattern) {
+          frequency = recDef.pattern.frequency || 'daily'
+          interval = recDef.pattern.interval || 1
+          daysOfWeek = recDef.pattern.daysOfWeek || []
+        }
+      } catch (error) {
+        console.error('Error loading recurrence pattern:', error)
+      }
+    }
+    
     setFormData({
       title: todo.title,
       description: todo.description,
       assignedTo: Array.isArray(todo.assignedTo) ? [...todo.assignedTo] : [],
       currentAssignee: '',
       isRecurring: todo.isRecurring || false,
-      frequency: 'daily',
-      interval: 1,
-      daysOfWeek: [],
+      frequency: frequency,
+      interval: interval,
+      daysOfWeek: daysOfWeek,
     })
     setEditingId(todo.id)
     setIsAdding(true)

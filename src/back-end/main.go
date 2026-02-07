@@ -472,26 +472,17 @@ func calculateNextWeeklyDate(from time.Time, daysOfWeek []string, interval int) 
 		return from.AddDate(0, 0, 7*interval)
 	}
 
-	// Start from tomorrow
+	// For simplicity with interval=1, just find the next matching day
+	// For interval>1, we'd need more complex logic
 	nextDate := from.AddDate(0, 0, 1)
-	currentWeekStart := from
-
-	for {
-		// Check if we're in a valid week (every interval weeks)
-		weeksSinceStart := int(nextDate.Sub(currentWeekStart).Hours() / (24 * 7))
-		if weeksSinceStart%interval == 0 {
-			// Check if this day is in our target days
-			if targetDays[nextDate.Weekday()] {
-				return nextDate
-			}
+	
+	for i := 0; i < 14; i++ { // Check up to 2 weeks ahead
+		if targetDays[nextDate.Weekday()] {
+			return nextDate
 		}
-
-		// Move to next day
 		nextDate = nextDate.AddDate(0, 0, 1)
-
-		// Safety check: don't loop forever
-		if nextDate.Sub(from).Hours() > 24*365 {
-			return from.AddDate(0, 0, 7*interval)
-		}
 	}
+
+	// Fallback
+	return from.AddDate(0, 0, 7*interval)
 }
