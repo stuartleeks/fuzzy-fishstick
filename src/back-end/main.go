@@ -129,6 +129,12 @@ func createTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate todo item
+	if err := validateTodoItem(&todo); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -159,6 +165,12 @@ func updateTodo(w http.ResponseWriter, r *http.Request) {
 
 	var updates TodoItem
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate todo item
+	if err := validateTodoItem(&updates); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -253,6 +265,14 @@ func convertTodoRecurring(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate pattern if converting to recurring
+	if request.ToRecurring {
+		if err := validateRecurrencePattern(request.Pattern); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -320,6 +340,12 @@ func createRecurringDef(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate recurring definition
+	if err := validateRecurringDefinition(&def); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -361,6 +387,12 @@ func updateRecurringDef(w http.ResponseWriter, r *http.Request) {
 
 	var updates RecurringItemDefinition
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Validate recurring definition
+	if err := validateRecurringDefinition(&updates); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -420,6 +452,66 @@ func deleteRecurringDef(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Validation functions
+
+// validateRecurrencePattern validates a recurrence pattern
+func validateRecurrencePattern(pattern RecurrencePattern) error {
+	// Validate frequency
+	validFrequencies := map[string]bool{
+		"daily":   true,
+		"weekly":  true,
+		"monthly": true,
+	}
+	if !validFrequencies[pattern.Frequency] {
+		return fmt.Errorf("invalid frequency: must be 'daily', 'weekly', or 'monthly'")
+	}
+
+	// Validate interval
+	if pattern.Interval < 1 {
+		return fmt.Errorf("interval must be at least 1")
+	}
+
+	// Validate days of week for weekly frequency
+	if pattern.Frequency == "weekly" && len(pattern.DaysOfWeek) > 0 {
+		validDays := map[string]bool{
+			"Sunday": true, "Monday": true, "Tuesday": true, "Wednesday": true,
+			"Thursday": true, "Friday": true, "Saturday": true,
+		}
+		for _, day := range pattern.DaysOfWeek {
+			if !validDays[day] {
+				return fmt.Errorf("invalid day of week: %s", day)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateTodoItem validates a todo item
+func validateTodoItem(todo *TodoItem) error {
+	// Validate title
+	if todo.Title == "" {
+		return fmt.Errorf("title is required")
+	}
+
+	return nil
+}
+
+// validateRecurringDefinition validates a recurring item definition
+func validateRecurringDefinition(def *RecurringItemDefinition) error {
+	// Validate title
+	if def.Title == "" {
+		return fmt.Errorf("title is required")
+	}
+
+	// Validate pattern
+	if err := validateRecurrencePattern(def.Pattern); err != nil {
+		return fmt.Errorf("invalid pattern: %w", err)
+	}
+
+	return nil
 }
 
 // calculateNextDueDate calculates the next due date based on a pattern
