@@ -46,14 +46,18 @@ export default defineConfig({
     {
       command: 'cd ../back-end && go run main.go',
       url: 'http://localhost:8080/api/todos',
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      stderr: 'pipe',
+      stdout: 'pipe',
     },
     {
       command: 'npm run dev',
       url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      stderr: 'pipe',
+      stdout: 'pipe',
     },
   ],
 });

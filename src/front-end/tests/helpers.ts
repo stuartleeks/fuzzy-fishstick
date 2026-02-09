@@ -268,15 +268,30 @@ export class TodoHelpers {
    * Clear all to-do items (for cleanup)
    */
   async clearAllTodos() {
-    // Keep deleting until no more delete buttons exist
-    while (true) {
-      const deleteButton = this.page.locator('.todo-table tbody tr:not(.quick-add-row) button[title="Delete"]').first();
-      const count = await deleteButton.count();
-      
-      if (count === 0) break;
-      
-      await deleteButton.click();
-      await this.page.waitForTimeout(300);
+    // Get all delete buttons and click them one by one
+    let attempts = 0;
+    const maxAttempts = 50; // Prevent infinite loop
+    
+    while (attempts < maxAttempts) {
+      try {
+        const deleteButtons = this.page.locator('.todo-table tbody tr:not(.quick-add-row) button[title="Delete"]');
+        const count = await deleteButtons.count();
+        
+        if (count === 0) break;
+        
+        // Click the first delete button
+        await deleteButtons.first().click({ timeout: 5000 });
+        
+        // Wait for the deletion to complete
+        await this.page.waitForTimeout(500);
+        
+        attempts++;
+      } catch (error) {
+        // If there's an error (e.g., element detached), try again
+        console.log('Error during clearAllTodos, retrying:', error);
+        attempts++;
+        await this.page.waitForTimeout(300);
+      }
     }
   }
 }
