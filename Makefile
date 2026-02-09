@@ -1,4 +1,4 @@
-.PHONY: frontend backend install-frontend run docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
+.PHONY: frontend backend install-frontend install-backend install-deps run docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -7,6 +7,11 @@ help: ## show this help
 
 install-frontend: ## Install front-end dependencies	
 	cd src/front-end && npm install
+
+install-backend: ## Install back-end dependencies
+	cd src/back-end && go mod tidy
+
+install-deps: install-backend install-frontend ## Install all dependencies (Go modules and npm packages)
 
 
 frontend: ## Run the front-end dev server
