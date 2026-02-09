@@ -200,7 +200,9 @@ func getEnv(key, defaultValue string) string {
 
 func generateSecret() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("Failed to generate random secret: %v", err)
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 

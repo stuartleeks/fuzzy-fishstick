@@ -1,5 +1,7 @@
 // Authentication configuration types and interfaces
 
+import type { Configuration } from '@azure/msal-browser'
+
 export interface AuthConfig {
   mode: 'dev' | 'prod'
   tenantId?: string
@@ -20,7 +22,7 @@ export interface UserInfo {
 }
 
 // MSAL configuration will be built dynamically after fetching from backend
-export let msalConfig: any = null
+export let msalConfig: Configuration | null = null
 export let authConfig: AuthConfig | null = null
 
 export async function initializeAuth(): Promise<AuthConfig> {
