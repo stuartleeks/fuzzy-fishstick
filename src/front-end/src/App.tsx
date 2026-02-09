@@ -57,12 +57,7 @@ function App() {
     }
   }, [getAccessToken])
 
-  // Show login page if not authenticated
-  if (!isAuthenticated) {
-    return <LoginPage />
-  }
-
-  // Load todos and recurring definitions
+  // Load todos and recurring definitions when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       loadTodos()
@@ -480,6 +475,11 @@ function App() {
         handleQuickAdd()
       }
     }
+  }
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage />
   }
 
   return (
