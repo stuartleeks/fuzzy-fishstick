@@ -18,6 +18,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 // AuthConfig holds authentication configuration
@@ -95,6 +96,13 @@ var store = &Store{
 }
 
 func main() {
+	// Load .env file if it exists (optional, no error if file doesn't exist)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found or error loading it (this is fine): %v", err)
+	} else {
+		log.Println("Loaded environment variables from .env file")
+	}
+
 	// Initialize authentication configuration
 	if err := initAuthConfig(); err != nil {
 		log.Fatalf("Failed to initialize auth config: %v", err)

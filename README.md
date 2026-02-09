@@ -75,12 +75,21 @@ See [Authentication Setup](#authentication-setup) for detailed configuration.
    cd src/back-end
    ```
 
-2. Install Go dependencies:
+2. (Optional) Create a `.env` file for configuration:
+   ```bash
+   # Copy the example file to get started
+   cp ../../.env.example .env
+   # Edit .env with your preferred settings
+   ```
+   
+   Note: The backend will automatically load variables from `.env` if it exists. You can also use system environment variables, which take precedence.
+
+3. Install Go dependencies:
    ```bash
    go mod tidy
    ```
 
-3. Run the API server:
+4. Run the API server:
    ```bash
    go run main.go
    ```
