@@ -3,10 +3,13 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import axios from 'axios'
 import './App.css'
 import type { TodoItem, RecurringItemDefinition, FormData, NewRowData, ReorderItem } from './types'
+import { useAuth } from './AuthProvider'
+import LoginPage from './LoginPage'
 
 const API_BASE = '/api'
 
 function App() {
+  const { isAuthenticated, user, logout, getAccessToken } = useAuth()
   const [todos, setTodos] = useState<TodoItem[]>([])
   const [recurringDefs, setRecurringDefs] = useState<RecurringItemDefinition[]>([])
   const [isAdding, setIsAdding] = useState<boolean>(false)
@@ -34,11 +37,38 @@ function App() {
     dueDate: '',
   })
 
+  // Setup axios interceptor to add auth token
+  useEffect(() => {
+    const interceptor = axios.interceptors.request.use(
+      async (config) => {
+        const token = await getAccessToken()
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error) => {
+        return Promise.reject(error)
+      }
+    )
+
+    return () => {
+      axios.interceptors.request.eject(interceptor)
+    }
+  }, [getAccessToken])
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage />
+  }
+
   // Load todos and recurring definitions
   useEffect(() => {
-    loadTodos()
-    loadRecurringDefs()
-  }, [])
+    if (isAuthenticated) {
+      loadTodos()
+      loadRecurringDefs()
+    }
+  }, [isAuthenticated])
 
   const loadTodos = async (): Promise<void> => {
     try {
@@ -46,6 +76,10 @@ function App() {
       setTodos(response.data || [])
     } catch (error) {
       console.error('Error loading todos:', error)
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        // Token expired or invalid - logout
+        logout()
+      }
     }
   }
 
@@ -55,6 +89,10 @@ function App() {
       setRecurringDefs(response.data || [])
     } catch (error) {
       console.error('Error loading recurring definitions:', error)
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        // Token expired or invalid - logout
+        logout()
+      }
     }
   }
 
@@ -448,6 +486,12 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>📝 To-Do List</h1>
+        <div className="user-info">
+          <span className="user-email">{user?.email}</span>
+          <button onClick={logout} className="btn-logout">
+            Logout
+          </button>
+        </div>
       </header>
 
       <div className="container">
