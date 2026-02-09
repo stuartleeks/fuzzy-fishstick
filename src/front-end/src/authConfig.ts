@@ -8,6 +8,7 @@ export interface AuthConfig {
   clientId: string
   authority: string
   users?: MockUser[]
+  allowedUsers?: string[]
 }
 
 export interface MockUser {

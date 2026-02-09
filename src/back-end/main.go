@@ -306,7 +306,8 @@ func isUserAllowed(email string) bool {
 
 func getAuthConfig(w http.ResponseWriter, r *http.Request) {
 	config := map[string]interface{}{
-		"mode": authConfig.Mode,
+		"mode":         authConfig.Mode,
+		"allowedUsers": authConfig.AllowedUsers,
 	}
 
 	if authConfig.Mode == "prod" {

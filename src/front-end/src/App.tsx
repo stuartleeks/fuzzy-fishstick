@@ -20,6 +20,10 @@ function App() {
   const [inlineEditField, setInlineEditField] = useState<'title' | 'description' | 'assignedTo' | 'dueDate' | null>(null)
   const [inlineAssignees, setInlineAssignees] = useState<string[]>([]) // Track assignees during inline editing
   const [inlineAssigneeInput, setInlineAssigneeInput] = useState<string>('') // Input for new assignee
+  const [allowedUsers, setAllowedUsers] = useState<string[]>([]) // List of allowed users for autocompletion
+  const [showFormAutocomplete, setShowFormAutocomplete] = useState<boolean>(false)
+  const [showInlineAutocomplete, setShowInlineAutocomplete] = useState<boolean>(false)
+  const [showQuickAddAutocomplete, setShowQuickAddAutocomplete] = useState<boolean>(false)
   const [newRowData, setNewRowData] = useState<NewRowData>({
     title: '',
     description: '',
@@ -62,6 +66,7 @@ function App() {
     if (isAuthenticated) {
       loadTodos()
       loadRecurringDefs()
+      loadAllowedUsers()
     }
   }, [isAuthenticated])
 
@@ -89,6 +94,26 @@ function App() {
         logout()
       }
     }
+  }
+
+  const loadAllowedUsers = async (): Promise<void> => {
+    try {
+      const response = await axios.get(`${API_BASE}/auth/config`)
+      if (response.data.allowedUsers) {
+        setAllowedUsers(response.data.allowedUsers)
+      }
+    } catch (error) {
+      console.error('Error loading allowed users:', error)
+    }
+  }
+
+  // Helper function to get filtered autocomplete suggestions
+  const getAutocompleteSuggestions = (input: string, existingAssignees: string[] = []): string[] => {
+    if (!input.trim()) return []
+    const lowerInput = input.toLowerCase()
+    return allowedUsers.filter(
+      user => user.toLowerCase().includes(lowerInput) && !existingAssignees.includes(user)
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -519,14 +544,37 @@ function App() {
               
               <div className="assignee-section">
                 <div className="assignee-input-group">
-                  <input
-                    type="text"
-                    placeholder="Add assignee (press Enter)"
-                    value={formData.currentAssignee}
-                    onChange={(e) => setFormData({ ...formData, currentAssignee: e.target.value })}
-                    onKeyDown={handleAssigneeKeyDown}
-                    className="input"
-                  />
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                      type="text"
+                      placeholder="Add assignee (press Enter)"
+                      value={formData.currentAssignee}
+                      onChange={(e) => {
+                        setFormData({ ...formData, currentAssignee: e.target.value })
+                        setShowFormAutocomplete(e.target.value.length > 0)
+                      }}
+                      onKeyDown={handleAssigneeKeyDown}
+                      onFocus={() => setShowFormAutocomplete(formData.currentAssignee.length > 0)}
+                      onBlur={() => setTimeout(() => setShowFormAutocomplete(false), 200)}
+                      className="input"
+                    />
+                    {showFormAutocomplete && getAutocompleteSuggestions(formData.currentAssignee, formData.assignedTo).length > 0 && (
+                      <div className="autocomplete-dropdown">
+                        {getAutocompleteSuggestions(formData.currentAssignee, formData.assignedTo).map((suggestion, idx) => (
+                          <div
+                            key={idx}
+                            className="autocomplete-item"
+                            onClick={() => {
+                              setFormData({ ...formData, assignedTo: [...formData.assignedTo, suggestion], currentAssignee: '' })
+                              setShowFormAutocomplete(false)
+                            }}
+                          >
+                            👤 {suggestion}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={handleAddAssignee}
@@ -538,7 +586,10 @@ function App() {
                 {formData.assignedTo.length > 0 && (
                   <div className="assignee-tags">
                     {formData.assignedTo.map((person, index) => (
-                      <span key={index} className="assignee-tag">
+                      <span 
+                        key={index} 
+                        className={`assignee-tag ${person === user?.email ? 'current-user' : ''}`}
+                      >
                         👤 {person}
                         <button
                           type="button"
@@ -797,7 +848,10 @@ function App() {
                               <div className="inline-assignee-edit">
                                 <div className="assignee-tags-inline">
                                   {inlineAssignees.map((person, idx) => (
-                                    <span key={idx} className="assignee-tag">
+                                    <span 
+                                      key={idx} 
+                                      className={`assignee-tag ${person === user?.email ? 'current-user' : ''}`}
+                                    >
                                       👤 {person}
                                       <button
                                         onClick={() => setInlineAssignees(inlineAssignees.filter((_, i) => i !== idx))}
@@ -808,29 +862,55 @@ function App() {
                                     </span>
                                   ))}
                                 </div>
-                                <input
-                                  type="text"
-                                  placeholder="Add assignee"
-                                  value={inlineAssigneeInput}
-                                  onChange={(e) => setInlineAssigneeInput(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && inlineAssigneeInput.trim()) {
-                                      e.preventDefault()
-                                      setInlineAssignees([...inlineAssignees, inlineAssigneeInput.trim()])
-                                      setInlineAssigneeInput('')
-                                    } else if (e.key === 'Escape') {
-                                      handleInlineEditCancel()
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    setTimeout(() => {
-                                      handleInlineEditSave(todo, 'assignedTo', inlineAssignees)
-                                    }, INLINE_EDIT_BLUR_DELAY)
-                                  }}
-                                  autoFocus
-                                  className="inline-edit-input"
-                                  style={{ width: '100%', marginTop: '4px' }}
-                                />
+                                <div style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Add assignee"
+                                    value={inlineAssigneeInput}
+                                    onChange={(e) => {
+                                      setInlineAssigneeInput(e.target.value)
+                                      setShowInlineAutocomplete(e.target.value.length > 0)
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && inlineAssigneeInput.trim()) {
+                                        e.preventDefault()
+                                        setInlineAssignees([...inlineAssignees, inlineAssigneeInput.trim()])
+                                        setInlineAssigneeInput('')
+                                        setShowInlineAutocomplete(false)
+                                      } else if (e.key === 'Escape') {
+                                        handleInlineEditCancel()
+                                      }
+                                    }}
+                                    onFocus={() => setShowInlineAutocomplete(inlineAssigneeInput.length > 0)}
+                                    onBlur={() => {
+                                      setTimeout(() => {
+                                        setShowInlineAutocomplete(false)
+                                        handleInlineEditSave(todo, 'assignedTo', inlineAssignees)
+                                      }, INLINE_EDIT_BLUR_DELAY)
+                                    }}
+                                    autoFocus
+                                    className="inline-edit-input"
+                                    style={{ width: '100%', marginTop: '4px' }}
+                                  />
+                                  {showInlineAutocomplete && getAutocompleteSuggestions(inlineAssigneeInput, inlineAssignees).length > 0 && (
+                                    <div className="autocomplete-dropdown">
+                                      {getAutocompleteSuggestions(inlineAssigneeInput, inlineAssignees).map((suggestion, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="autocomplete-item"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            setInlineAssignees([...inlineAssignees, suggestion])
+                                            setInlineAssigneeInput('')
+                                            setShowInlineAutocomplete(false)
+                                          }}
+                                        >
+                                          👤 {suggestion}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ) : (
                               <div 
@@ -841,7 +921,10 @@ function App() {
                                 {todo.assignedTo && todo.assignedTo.length > 0 ? (
                                   <div className="assignee-badges">
                                     {todo.assignedTo.map((person, idx) => (
-                                      <span key={idx} className="assignee-badge-small">
+                                      <span 
+                                        key={idx} 
+                                        className={`assignee-badge-small ${person === user?.email ? 'current-user' : ''}`}
+                                      >
                                         👤 {person}
                                       </span>
                                     ))}
@@ -939,15 +1022,51 @@ function App() {
                       />
                     </td>
                     <td className="col-assigned">
-                      <input
-                        type="text"
-                        placeholder="Assignees..."
-                        value={newRowData.assignedTo}
-                        onChange={(e) => setNewRowData({ ...newRowData, assignedTo: e.target.value })}
-                        onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
-                        onBlur={handleQuickAdd}
-                        className="quick-add-input"
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Assignees..."
+                          value={newRowData.assignedTo}
+                          onChange={(e) => {
+                            setNewRowData({ ...newRowData, assignedTo: e.target.value })
+                            setShowQuickAddAutocomplete(e.target.value.length > 0 && e.target.value.split(',').pop()?.trim().length! > 0)
+                          }}
+                          onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
+                          onFocus={() => {
+                            const lastEntry = newRowData.assignedTo.split(',').pop()?.trim() || ''
+                            setShowQuickAddAutocomplete(lastEntry.length > 0)
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setShowQuickAddAutocomplete(false), 200)
+                            handleQuickAdd()
+                          }}
+                          className="quick-add-input"
+                        />
+                        {showQuickAddAutocomplete && (() => {
+                          const entries = newRowData.assignedTo.split(',').map(e => e.trim())
+                          const lastEntry = entries[entries.length - 1] || ''
+                          const existingAssignees = entries.slice(0, -1).filter(e => e.length > 0)
+                          const suggestions = getAutocompleteSuggestions(lastEntry, existingAssignees)
+                          return suggestions.length > 0 ? (
+                            <div className="autocomplete-dropdown">
+                              {suggestions.map((suggestion, idx) => (
+                                <div
+                                  key={idx}
+                                  className="autocomplete-item"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    const beforeLast = entries.slice(0, -1).filter(e => e.length > 0)
+                                    setNewRowData({ ...newRowData, assignedTo: [...beforeLast, suggestion].join(', ') + ', ' })
+                                    setShowQuickAddAutocomplete(false)
+                                  }}
+                                >
+                                  👤 {suggestion}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null
+                        })()}
+                      </div>
                     </td>
                     <td className="col-due"></td>
                     <td className="col-actions"></td>
