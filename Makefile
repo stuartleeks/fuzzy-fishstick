@@ -1,4 +1,4 @@
-.PHONY: frontend backend install-frontend install-backend install-deps run docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
+.PHONY: frontend backend install-frontend install-backend install-deps run test test-ui test-headed docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -23,6 +23,15 @@ backend: ## Run the back-end server
 
 run: ## Run both front-end and back-end concurrently
 	$(MAKE) backend & $(MAKE) frontend
+
+test: ## Run Playwright tests
+	cd src/front-end && npm test
+
+test-ui: ## Run Playwright tests in interactive UI mode
+	cd src/front-end && npm run test:ui
+
+test-headed: ## Run Playwright tests in headed mode (visible browser)
+	cd src/front-end && npm run test:headed
 
 docker-build-backend: ## Build backend Docker image
 	docker build -t fuzzy-fishstick-backend:latest src/back-end

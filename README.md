@@ -161,6 +161,19 @@ npm run test:ui
 npm run test:report
 ```
 
+**Using Makefile** (from project root):
+
+```bash
+# Run all tests
+make test
+
+# Run tests with UI mode (interactive)
+make test-ui
+
+# Run tests in headed mode (see the browser)
+make test-headed
+```
+
 **Note**: Tests require both the backend and frontend servers to be running. The test configuration will automatically start them, or you can start them manually first.
 
 #### Test Coverage
