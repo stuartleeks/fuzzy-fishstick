@@ -49,11 +49,14 @@ export class TodoHelpers {
       await this.page.fill('.quick-add-row input[placeholder="Assignees..."]', assignee);
     }
     
-    // Press Enter to submit and blur at the same time to prevent double submission
+    // Press Enter to submit
     await titleInput.press('Enter');
     
-    // Wait for the item to appear in the table (with slight delay for API call)
-    await this.page.waitForTimeout(500);
+    // Wait for the network request to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    
+    // Additional wait for UI to update
+    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -268,30 +271,42 @@ export class TodoHelpers {
    * Clear all to-do items (for cleanup)
    */
   async clearAllTodos() {
-    // Get all delete buttons and click them one by one
-    let attempts = 0;
-    const maxAttempts = 50; // Prevent infinite loop
+    // Wait for page to be ready
+    await this.page.waitForLoadState('domcontentloaded');
     
-    while (attempts < maxAttempts) {
+    // Keep deleting until no items remain, with better timing
+    for (let attempt = 0; attempt < 50; attempt++) {
       try {
+        // Wait for any pending network activity
+        await this.page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => {});
+        
+        // Check how many delete buttons exist
         const deleteButtons = this.page.locator('.todo-table tbody tr:not(.quick-add-row) button[title="Delete"]');
         const count = await deleteButtons.count();
         
-        if (count === 0) break;
+        if (count === 0) {
+          // Double-check after a brief wait
+          await this.page.waitForTimeout(300);
+          const finalCount = await deleteButtons.count();
+          if (finalCount === 0) {
+            break; // Really done
+          }
+        }
         
         // Click the first delete button
-        await deleteButtons.first().click({ timeout: 5000 });
+        await deleteButtons.first().click({ timeout: 3000 });
         
-        // Wait for the deletion to complete
-        await this.page.waitForTimeout(500);
-        
-        attempts++;
+        // Wait for the deletion to process
+        await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+        await this.page.waitForTimeout(400);
       } catch (error) {
-        // If there's an error (e.g., element detached), try again
-        console.log('Error during clearAllTodos, retrying:', error);
-        attempts++;
-        await this.page.waitForTimeout(300);
+        // If click failed, the element might be gone already
+        await this.page.waitForTimeout(200);
       }
     }
+    
+    // Final wait to ensure everything is settled
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await this.page.waitForTimeout(500);
   }
 }
