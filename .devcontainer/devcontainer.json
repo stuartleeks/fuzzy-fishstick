@@ -22,14 +22,17 @@
 				"golang.go",
 				"dbaeumer.vscode-eslint",
 				"esbenp.prettier-vscode",
-				"bradlc.vscode-tailwindcss"
+				"bradlc.vscode-tailwindcss",
+				"ms-playwright.playwright"
 			],
 			"settings": {
 				"go.toolsManagement.autoUpdate": true,
 				"editor.formatOnSave": true,
 				"editor.codeActionsOnSave": {
 					"source.fixAll.eslint": "explicit"
-				}
+				},
+				"playwright.reuseBrowser": true,
+				"playwright.showTrace": true
 			}
 		}
 	},

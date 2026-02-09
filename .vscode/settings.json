@@ -1,0 +1,12 @@
+{
+  "playwright.reuseBrowser": true,
+  "playwright.showTrace": true,
+  "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
+  "testing.openTesting": "neverOpen",
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}

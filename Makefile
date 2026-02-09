@@ -1,4 +1,4 @@
-.PHONY: frontend backend install-frontend install-backend install-deps run test test-ui test-headed docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
+.PHONY: frontend backend install-frontend install-backend install-playwright install-deps run test test-ui test-headed docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -11,7 +11,10 @@ install-frontend: ## Install front-end dependencies
 install-backend: ## Install back-end dependencies
 	cd src/back-end && go mod tidy
 
-install-deps: install-backend install-frontend ## Install all dependencies (Go modules and npm packages)
+install-playwright: ## Install Playwright browsers
+	cd src/front-end && npx playwright install --with-deps
+
+install-deps: install-backend install-frontend install-playwright ## Install all dependencies (Go modules, npm packages, and Playwright browsers)
 
 
 frontend: ## Run the front-end dev server
