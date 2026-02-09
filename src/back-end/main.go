@@ -1,17 +1,50 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
+
+// AuthConfig holds authentication configuration
+type AuthConfig struct {
+	Mode             string   // "dev" or "prod"
+	AllowedUsers     []string // List of allowed user emails
+	TenantID         string   // Entra ID tenant ID (for prod)
+	ClientID         string   // Entra ID client ID (for prod)
+	DevSecret        string   // Secret for dev mode JWT signing
+	oidcVerifier     *oidc.IDTokenVerifier
+}
+
+var authConfig *AuthConfig
+
+// MockUser represents a test user for development mode
+type MockUser struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Sub   string `json:"sub"`
+}
+
+var mockUsers = []MockUser{
+	{Email: "alice@example.com", Name: "Alice Smith", Sub: "alice"},
+	{Email: "bob@example.com", Name: "Bob Jones", Sub: "bob"},
+	{Email: "charlie@example.com", Name: "Charlie Brown", Sub: "charlie"},
+}
 
 // RecurrencePattern defines how a to-do item recurs
 type RecurrencePattern struct {
@@ -63,27 +96,54 @@ var store = &Store{
 }
 
 func main() {
+	// Load .env file if it exists (optional, no error if file doesn't exist)
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found or error loading it (this is fine): %v", err)
+	} else {
+		log.Println("Loaded environment variables from .env file")
+	}
+
+	// Initialize authentication configuration
+	if err := initAuthConfig(); err != nil {
+		log.Fatalf("Failed to initialize auth config: %v", err)
+	}
+
 	r := mux.NewRouter()
 
 	// Enable CORS
 	r.Use(corsMiddleware)
 
-	// Todo routes
-	r.HandleFunc("/api/todos", getTodos).Methods("GET")
-	r.HandleFunc("/api/todos", createTodo).Methods("POST")
-	r.HandleFunc("/api/todos/{id}", updateTodo).Methods("PUT")
-	r.HandleFunc("/api/todos/{id}", deleteTodo).Methods("DELETE")
-	r.HandleFunc("/api/todos/reorder", reorderTodos).Methods("POST")
-	r.HandleFunc("/api/todos/{id}/convert-recurring", convertTodoRecurring).Methods("POST")
+	// Auth endpoints (public)
+	r.HandleFunc("/api/auth/config", getAuthConfig).Methods("GET")
+	r.HandleFunc("/api/auth/me", authMiddleware(getCurrentUser)).Methods("GET")
+	
+	// Dev mode OAuth2 endpoints
+	if authConfig.Mode == "dev" {
+		r.HandleFunc("/api/auth/dev/authorize", devAuthorize).Methods("GET")
+		r.HandleFunc("/api/auth/dev/token", devToken).Methods("POST")
+		r.HandleFunc("/api/auth/dev/userinfo", devUserInfo).Methods("GET")
+		r.HandleFunc("/.well-known/openid-configuration", devOpenIDConfig).Methods("GET")
+	}
 
-	// Recurring item routes
-	r.HandleFunc("/api/recurring", getRecurringDefs).Methods("GET")
-	r.HandleFunc("/api/recurring", createRecurringDef).Methods("POST")
-	r.HandleFunc("/api/recurring/{id}", updateRecurringDef).Methods("PUT")
-	r.HandleFunc("/api/recurring/{id}", deleteRecurringDef).Methods("DELETE")
+	// Protected Todo routes
+	r.HandleFunc("/api/todos", authMiddleware(getTodos)).Methods("GET")
+	r.HandleFunc("/api/todos", authMiddleware(createTodo)).Methods("POST")
+	r.HandleFunc("/api/todos/{id}", authMiddleware(updateTodo)).Methods("PUT")
+	r.HandleFunc("/api/todos/{id}", authMiddleware(deleteTodo)).Methods("DELETE")
+	r.HandleFunc("/api/todos/reorder", authMiddleware(reorderTodos)).Methods("POST")
+	r.HandleFunc("/api/todos/{id}/convert-recurring", authMiddleware(convertTodoRecurring)).Methods("POST")
+
+	// Protected Recurring item routes
+	r.HandleFunc("/api/recurring", authMiddleware(getRecurringDefs)).Methods("GET")
+	r.HandleFunc("/api/recurring", authMiddleware(createRecurringDef)).Methods("POST")
+	r.HandleFunc("/api/recurring/{id}", authMiddleware(updateRecurringDef)).Methods("PUT")
+	r.HandleFunc("/api/recurring/{id}", authMiddleware(deleteRecurringDef)).Methods("DELETE")
 
 	port := 8080
-	log.Printf("Starting server on port %d...", port)
+	log.Printf("Starting server on port %d with auth mode: %s", port, authConfig.Mode)
+	if authConfig.Mode == "dev" {
+		log.Printf("Dev mode users: %v", mockUsers)
+	}
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), r))
 }
 
@@ -91,7 +151,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -100,6 +160,310 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// initAuthConfig initializes authentication configuration from environment variables
+func initAuthConfig() error {
+	authConfig = &AuthConfig{
+		Mode:      getEnv("AUTH_MODE", "dev"),
+		TenantID:  getEnv("ENTRA_TENANT_ID", ""),
+		ClientID:  getEnv("ENTRA_CLIENT_ID", ""),
+		DevSecret: getEnv("DEV_AUTH_SECRET", generateSecret()),
+	}
+
+	// Parse allowed users from environment
+	allowedUsersStr := getEnv("ALLOWED_USERS", "alice@example.com,bob@example.com")
+	authConfig.AllowedUsers = strings.Split(allowedUsersStr, ",")
+	for i := range authConfig.AllowedUsers {
+		authConfig.AllowedUsers[i] = strings.TrimSpace(authConfig.AllowedUsers[i])
+	}
+
+	// Initialize OIDC verifier for production mode
+	if authConfig.Mode == "prod" {
+		if authConfig.TenantID == "" || authConfig.ClientID == "" {
+			return fmt.Errorf("ENTRA_TENANT_ID and ENTRA_CLIENT_ID are required in production mode")
+		}
+
+		issuer := fmt.Sprintf("https://login.microsoftonline.com/%s/v2.0", authConfig.TenantID)
+		provider, err := oidc.NewProvider(context.Background(), issuer)
+		if err != nil {
+			return fmt.Errorf("failed to create OIDC provider: %w", err)
+		}
+
+		authConfig.oidcVerifier = provider.Verifier(&oidc.Config{
+			ClientID: authConfig.ClientID,
+		})
+	}
+
+	log.Printf("Auth configuration: mode=%s, allowed_users=%v", authConfig.Mode, authConfig.AllowedUsers)
+	return nil
+}
+
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func generateSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("Failed to generate random secret: %v", err)
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+// authMiddleware validates JWT tokens and checks user authorization
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Missing authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			return
+		}
+
+		tokenString := parts[1]
+		var email string
+		var err error
+
+		if authConfig.Mode == "dev" {
+			email, err = validateDevToken(tokenString)
+		} else {
+			email, err = validateProdToken(r.Context(), tokenString)
+		}
+
+		if err != nil {
+			log.Printf("Token validation failed: %v", err)
+			http.Error(w, fmt.Sprintf("Invalid token: %v", err), http.StatusUnauthorized)
+			return
+		}
+
+		// Check if user is in allowed list
+		if !isUserAllowed(email) {
+			log.Printf("User not authorized: %s", email)
+			http.Error(w, "User not authorized to access this application", http.StatusForbidden)
+			return
+		}
+
+		// Add user email to context for downstream handlers
+		ctx := context.WithValue(r.Context(), "userEmail", email)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	}
+}
+
+func validateDevToken(tokenString string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(authConfig.DevSecret), nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if email, ok := claims["email"].(string); ok {
+			return email, nil
+		}
+		return "", fmt.Errorf("email claim not found")
+	}
+
+	return "", fmt.Errorf("invalid token")
+}
+
+func validateProdToken(ctx context.Context, tokenString string) (string, error) {
+	idToken, err := authConfig.oidcVerifier.Verify(ctx, tokenString)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify token: %w", err)
+	}
+
+	var claims struct {
+		Email string `json:"email"`
+	}
+
+	if err := idToken.Claims(&claims); err != nil {
+		return "", fmt.Errorf("failed to parse claims: %w", err)
+	}
+
+	if claims.Email == "" {
+		return "", fmt.Errorf("email claim not found in token")
+	}
+
+	return claims.Email, nil
+}
+
+func isUserAllowed(email string) bool {
+	for _, allowedEmail := range authConfig.AllowedUsers {
+		if strings.EqualFold(email, allowedEmail) {
+			return true
+		}
+	}
+	return false
+}
+
+// Auth API endpoints
+
+func getAuthConfig(w http.ResponseWriter, r *http.Request) {
+	config := map[string]interface{}{
+		"mode":         authConfig.Mode,
+		"allowedUsers": authConfig.AllowedUsers,
+	}
+
+	if authConfig.Mode == "prod" {
+		config["tenantId"] = authConfig.TenantID
+		config["clientId"] = authConfig.ClientID
+	} else {
+		config["authority"] = fmt.Sprintf("http://localhost:8080")
+		config["clientId"] = "dev-client-id"
+		config["users"] = mockUsers
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(config)
+}
+
+func getCurrentUser(w http.ResponseWriter, r *http.Request) {
+	email := r.Context().Value("userEmail").(string)
+	
+	response := map[string]string{
+		"email": email,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Dev mode OAuth2 endpoints
+
+func devAuthorize(w http.ResponseWriter, r *http.Request) {
+	// In a real OAuth2 flow, this would present a login form
+	// For dev mode, we'll auto-approve with a mock user
+	redirectURI := r.URL.Query().Get("redirect_uri")
+	state := r.URL.Query().Get("state")
+
+	if redirectURI == "" {
+		http.Error(w, "redirect_uri is required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate a mock authorization code
+	code := base64.URLEncoding.EncodeToString([]byte(fmt.Sprintf("code-%d", time.Now().Unix())))
+
+	// Redirect back with code
+	redirectURL := fmt.Sprintf("%s?code=%s&state=%s", redirectURI, code, state)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+func devToken(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	grantType := r.FormValue("grant_type")
+	if grantType != "authorization_code" {
+		http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
+		return
+	}
+
+	// Use first mock user by default
+	user := mockUsers[0]
+	
+	// Check if a specific user was requested (via username parameter)
+	if username := r.FormValue("username"); username != "" {
+		for _, u := range mockUsers {
+			if u.Sub == username {
+				user = u
+				break
+			}
+		}
+	}
+
+	// Generate JWT access token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":   user.Sub,
+		"email": user.Email,
+		"name":  user.Name,
+		"iat":   time.Now().Unix(),
+		"exp":   time.Now().Add(24 * time.Hour).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(authConfig.DevSecret))
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"access_token": tokenString,
+		"token_type":   "Bearer",
+		"expires_in":   86400,
+		"id_token":     tokenString, // Same as access token for dev mode
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func devUserInfo(w http.ResponseWriter, r *http.Request) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Missing authorization header", http.StatusUnauthorized)
+		return
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		http.Error(w, "Invalid authorization header", http.StatusUnauthorized)
+		return
+	}
+
+	email, err := validateDevToken(parts[1])
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// Find the user
+	var user *MockUser
+	for _, u := range mockUsers {
+		if u.Email == email {
+			user = &u
+			break
+		}
+	}
+
+	if user == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func devOpenIDConfig(w http.ResponseWriter, r *http.Request) {
+	baseURL := fmt.Sprintf("http://%s", r.Host)
+	
+	config := map[string]interface{}{
+		"issuer":                 baseURL,
+		"authorization_endpoint": baseURL + "/api/auth/dev/authorize",
+		"token_endpoint":         baseURL + "/api/auth/dev/token",
+		"userinfo_endpoint":      baseURL + "/api/auth/dev/userinfo",
+		"jwks_uri":               baseURL + "/api/auth/dev/jwks",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(config)
 }
 
 // getTodos returns all to-do items sorted by position

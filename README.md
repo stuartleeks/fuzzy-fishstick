@@ -10,6 +10,7 @@ A To-Do List application with a React frontend and Go backend API.
 - ✓ Mark items as completed
 - 🔀 Drag and drop to reorder items
 - 📱 Responsive design
+- 🔐 **Authentication with Microsoft Entra ID or local dev mode**
 
 ## Project Structure
 
@@ -26,6 +27,7 @@ A To-Do List application with a React frontend and Go backend API.
 - **Backend**: Go API with RESTful endpoints
 - **Frontend**: React with Vite
 - **Storage**: In-memory (data resets on server restart)
+- **Authentication**: Microsoft Entra ID (production) or mock OAuth server (development)
 
 ## Prerequisites
 
@@ -36,6 +38,24 @@ A To-Do List application with a React frontend and Go backend API.
 **Or use the Dev Container:**
 - Docker
 - VS Code with Remote - Containers extension
+
+## Authentication
+
+The application supports two authentication modes:
+
+### Development Mode (Default)
+- Uses an embedded mock OAuth2 server in the backend
+- Provides test users: Alice, Bob, and Charlie
+- Perfect for local development without internet connectivity
+- No external configuration required
+
+### Production Mode
+- Uses Microsoft Entra ID (Azure AD) for authentication
+- Requires Entra ID app registration
+- Validates JWT tokens with OIDC
+- Configurable allowed users list
+
+See [Authentication Setup](#authentication-setup) for detailed configuration.
 
 ## Getting Started
 
@@ -55,12 +75,21 @@ A To-Do List application with a React frontend and Go backend API.
    cd src/back-end
    ```
 
-2. Install Go dependencies:
+2. (Optional) Create a `.env` file for configuration:
+   ```bash
+   # Copy the example file to get started
+   cp ../../.env.example .env
+   # Edit .env with your preferred settings
+   ```
+   
+   Note: The backend will automatically load variables from `.env` if it exists. You can also use system environment variables, which take precedence.
+
+3. Install Go dependencies:
    ```bash
    go mod tidy
    ```
 
-3. Run the API server:
+4. Run the API server:
    ```bash
    go run main.go
    ```
@@ -209,6 +238,102 @@ docker run -d -p 8080:8080 --name backend fuzzy-fishstick-backend:latest
 docker run -d -p 80:80 --name frontend --link backend:backend fuzzy-fishstick-frontend:latest
 ```
 
+## Authentication Setup
+
+### Development Mode (Default)
+
+No configuration required! Simply run the application and it will use the embedded mock OAuth server.
+
+**Test Users:**
+- Alice Smith (alice@example.com)
+- Bob Jones (bob@example.com)
+- Charlie Brown (charlie@example.com)
+
+When you click "Sign In", you'll be prompted to select a test user.
+
+### Production Mode with Microsoft Entra ID
+
+#### 1. Register Your Application in Azure Portal
+
+1. Go to [Azure Portal](https://portal.azure.com/)
+2. Navigate to "Microsoft Entra ID" > "App registrations"
+3. Click "New registration"
+4. Configure:
+   - **Name**: fuzzy-fishstick (or your preferred name)
+   - **Supported account types**: Choose based on your needs (e.g., "Accounts in this organizational directory only")
+   - **Redirect URI**: Select "Single-page application (SPA)" and enter your application URL (e.g., `https://yourdomain.com`)
+5. Click "Register"
+
+#### 2. Configure the Application
+
+After registration:
+1. Note the **Application (client) ID** and **Directory (tenant) ID** from the Overview page
+2. Go to "Authentication" and ensure:
+   - Platform: Single-page application
+   - Redirect URIs are correctly set
+   - Implicit grant: ID tokens (optional, for hybrid flows)
+3. Go to "Token configuration" and add optional claims if needed:
+   - email
+   - preferred_username
+
+#### 3. Configure Environment Variables
+
+Create a `.env` file (or set environment variables) with:
+
+```bash
+# Set to production mode
+AUTH_MODE=prod
+
+# Your Entra ID configuration
+ENTRA_TENANT_ID=your-tenant-id-here
+ENTRA_CLIENT_ID=your-client-id-here
+
+# Comma-separated list of allowed user emails
+ALLOWED_USERS=user1@yourdomain.com,user2@yourdomain.com
+```
+
+#### 4. Run the Application
+
+```bash
+# Backend
+cd src/back-end
+export AUTH_MODE=prod
+export ENTRA_TENANT_ID=your-tenant-id
+export ENTRA_CLIENT_ID=your-client-id
+export ALLOWED_USERS=user1@yourdomain.com,user2@yourdomain.com
+go run main.go
+
+# Frontend
+cd src/front-end
+npm run dev
+```
+
+### Environment Variables Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTH_MODE` | No | `dev` | Authentication mode: `dev` or `prod` |
+| `ALLOWED_USERS` | No | `alice@example.com,bob@example.com,charlie@example.com` | Comma-separated list of allowed user emails |
+| `ENTRA_TENANT_ID` | Yes (prod) | - | Microsoft Entra ID tenant ID |
+| `ENTRA_CLIENT_ID` | Yes (prod) | - | Microsoft Entra ID application (client) ID |
+| `DEV_AUTH_SECRET` | No | Auto-generated | Secret for JWT signing in dev mode |
+
+### Docker Deployment with Authentication
+
+Update your `docker-compose.yml` or set environment variables:
+
+```bash
+# Development mode (default)
+docker-compose up -d
+
+# Production mode
+AUTH_MODE=prod \
+ENTRA_TENANT_ID=your-tenant-id \
+ENTRA_CLIENT_ID=your-client-id \
+ALLOWED_USERS=user1@yourdomain.com,user2@yourdomain.com \
+docker-compose up -d
+```
+
 ## CI/CD
 
 The project includes GitHub Actions workflows for:
@@ -221,6 +346,15 @@ Published images:
 - `ghcr.io/stuartleeks/fuzzy-fishstick/backend:latest`
 - `ghcr.io/stuartleeks/fuzzy-fishstick/frontend:latest`
 - `ghcr.io/stuartleeks/fuzzy-fishstick/devcontainer:latest`
+
+## Security
+
+- All API endpoints require valid authentication tokens
+- JWT tokens are validated on every request
+- User authorization is checked against an allowed users list
+- CORS is configured to allow cross-origin requests (configure appropriately for production)
+- In development mode, tokens are signed with a secure random key
+- In production mode, tokens are validated using Microsoft Entra ID's public keys
 
 ## License
 

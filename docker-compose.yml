@@ -11,6 +11,12 @@ services:
     restart: unless-stopped
     networks:
       - fuzzy-fishstick-network
+    environment:
+      - AUTH_MODE=${AUTH_MODE:-dev}
+      - ALLOWED_USERS=${ALLOWED_USERS:-alice@example.com,bob@example.com,charlie@example.com}
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - DEV_AUTH_SECRET=${DEV_AUTH_SECRET:-}
 
   frontend:
     build:

@@ -7,11 +7,16 @@
 *.test
 *.out
 go.work
+src/back-end/todo-api
+
+# Environment files
+.env
+src/back-end/.env
+src/front-end/.env
 
 # Frontend
 src/front-end/node_modules/
 src/front-end/dist/
-src/front-end/.env
 
 # Temporary files
 /tmp/
