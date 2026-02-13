@@ -19,8 +19,8 @@ test.describe('Recurring To-Do Items', () => {
       interval: 1
     });
     
-    // Verify the item appears
-    await expect(page.locator('text=Daily standup')).toBeVisible();
+    // Verify the item appears - use .first()
+    await expect(page.locator('text=Daily standup').first()).toBeVisible();
     
     // Verify it has a recurring badge
     expect(await helpers.hasRecurringBadge('Daily standup')).toBe(true);
@@ -36,8 +36,8 @@ test.describe('Recurring To-Do Items', () => {
       daysOfWeek: ['Monday', 'Friday']
     });
     
-    // Verify the item appears
-    await expect(page.locator('text=Weekly review')).toBeVisible();
+    // Verify the item appears - use .first()
+    await expect(page.locator('text=Weekly review').first()).toBeVisible();
     
     // Verify it has a recurring badge
     expect(await helpers.hasRecurringBadge('Weekly review')).toBe(true);
@@ -52,8 +52,8 @@ test.describe('Recurring To-Do Items', () => {
       interval: 1
     });
     
-    // Verify the item appears
-    await expect(page.locator('text=Monthly report')).toBeVisible();
+    // Verify the item appears - use .first()
+    await expect(page.locator('text=Monthly report').first()).toBeVisible();
     
     // Verify it has a recurring badge
     expect(await helpers.hasRecurringBadge('Monthly report')).toBe(true);

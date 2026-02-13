@@ -620,8 +620,8 @@ function App() {
                 )}
               </label>
 
-              {/* Show recurrence pattern only when creating/editing recurring definition */}
-              {formData.isRecurring && editingRecurringDefId && (
+              {/* Show recurrence pattern when creating new recurring item or editing recurring definition */}
+              {formData.isRecurring && (editingRecurringDefId || !editingId) && (
                 <div className="recurring-options">
                   <select
                     value={formData.frequency}
@@ -643,7 +643,7 @@ function App() {
                 </div>
               )}
 
-              {formData.isRecurring && editingRecurringDefId && formData.frequency === 'weekly' && (
+              {formData.isRecurring && (editingRecurringDefId || !editingId) && formData.frequency === 'weekly' && (
                 <div className="days-of-week">
                   <p className="days-label">Select days:</p>
                   <div className="day-checkboxes">

@@ -99,19 +99,25 @@ export class TodoHelpers {
     }
     
     if (data.isRecurring) {
-      await this.page.check('input[type="checkbox"]:near(:text("Make this a recurring item"))');
+      // Check the recurring checkbox (find by label text nearby)
+      await this.page.check('label:has-text("Make this a recurring item") input[type="checkbox"]');
+      
+      // Wait for recurring options to appear
+      await this.page.waitForSelector('select', { timeout: 5000 });
       
       if (data.frequency) {
-        await this.page.selectOption('select:near(:text("Frequency"))', data.frequency);
+        await this.page.selectOption('select', data.frequency);
       }
       
       if (data.interval) {
-        await this.page.fill('input[placeholder="Interval"]', data.interval.toString());
+        await this.page.fill('input[type="number"][placeholder="Interval"]', data.interval.toString());
       }
       
       if (data.daysOfWeek && data.frequency === 'weekly') {
+        // Wait for days checkboxes to appear
+        await this.page.waitForSelector('.day-checkboxes', { timeout: 3000 });
         for (const day of data.daysOfWeek) {
-          await this.page.check(`input[type="checkbox"][value="${day}"]`);
+          await this.page.check(`input[type="checkbox"]:near(:text("${day.substring(0, 3)}"))`);
         }
       }
     } else if (data.dueDate) {
