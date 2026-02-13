@@ -295,8 +295,17 @@ function App() {
     }
     
     // Format due date for input field (YYYY-MM-DD)
-    const dueDate = todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : ''
-    
+    function formatDueDateForInput(dueDate?: string): string {
+      if (!dueDate) return ''
+      const date = new Date(dueDate)
+      if (isNaN(date.getTime())) {
+        console.error('Invalid due date:', dueDate)
+        return ''
+      }
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    }
+    const dueDate: string = formatDueDateForInput(todo.dueDate)
+
     setFormData({
       title: todo.title,
       description: todo.description,
@@ -395,7 +404,7 @@ function App() {
           }
           updatedTodo.dueDate = date.toISOString()
         } else {
-          updatedTodo.dueDate = null // Clear the due date if empty
+          updatedTodo.dueDate = undefined // Clear the due date if empty
         }
       }
       await axios.put(`${API_BASE}/todos/${todo.id}`, updatedTodo)
@@ -442,6 +451,8 @@ function App() {
 
     const items = Array.from(todos)
     const [reorderedItem] = items.splice(result.source.index, 1)
+    if (!reorderedItem)
+      return
     items.splice(result.destination.index, 0, reorderedItem)
 
     // Update local state optimistically
@@ -459,18 +470,6 @@ function App() {
       console.error('Error reordering todos:', error)
       // Reload on error
       loadTodos()
-    }
-  }
-
-  const handleDeleteRecurring = async (id: number): Promise<void> => {
-    if (!window.confirm('Delete this recurring item definition?')) return
-    
-    try {
-      await axios.delete(`${API_BASE}/recurring/${id}`)
-      await loadRecurringDefs()
-      await loadTodos()
-    } catch (error) {
-      console.error('Error deleting recurring definition:', error)
     }
   }
 
@@ -1006,7 +1005,6 @@ function App() {
                         value={newRowData.title}
                         onChange={(e) => setNewRowData({ ...newRowData, title: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'title')}
-                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
@@ -1017,7 +1015,6 @@ function App() {
                         value={newRowData.description}
                         onChange={(e) => setNewRowData({ ...newRowData, description: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'description')}
-                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
@@ -1038,7 +1035,6 @@ function App() {
                           }}
                           onBlur={() => {
                             setTimeout(() => setShowQuickAddAutocomplete(false), 200)
-                            handleQuickAdd()
                           }}
                           className="quick-add-input"
                         />
