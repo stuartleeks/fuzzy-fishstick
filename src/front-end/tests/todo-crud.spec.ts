@@ -72,8 +72,8 @@ test.describe('To-Do CRUD Operations', () => {
     // Delete the item
     await helpers.deleteTodo('Item to delete');
     
-    // Verify it's gone
-    await expect(page.locator('text=Item to delete')).not.toBeVisible();
+    // Verify it's gone - count should be 0
+    await expect(page.locator('text=Item to delete')).toHaveCount(0);
   });
 
   test('should add multiple to-do items', async ({ page }) => {

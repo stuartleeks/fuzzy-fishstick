@@ -16,11 +16,14 @@ test.describe('To-Do Reordering', () => {
     await helpers.addQuickTodo('Second item', 'Item 2');
     await helpers.addQuickTodo('Third item', 'Item 3');
     
+    // Wait for all items to appear
+    await page.waitForTimeout(500);
+    
     // Get initial order
     let titles = await helpers.getTodoTitles();
-    expect(titles[0]).toContain('First item');
-    expect(titles[1]).toContain('Second item');
-    expect(titles[2]).toContain('Third item');
+    expect(titles[0] || '').toContain('First item');
+    expect(titles[1] || '').toContain('Second item');
+    expect(titles[2] || '').toContain('Third item');
     
     // Drag third item to first position
     await helpers.reorderTodo('Third item', 'First item');
@@ -30,8 +33,8 @@ test.describe('To-Do Reordering', () => {
     // Note: The exact order depends on the drag-and-drop implementation
     // We just verify that the order has changed
     const hasChanged = 
-      titles[0].includes('Third item') || 
-      titles[1].includes('Third item');
+      titles[0]?.includes('Third item') || 
+      titles[1]?.includes('Third item');
     expect(hasChanged).toBe(true);
   });
 

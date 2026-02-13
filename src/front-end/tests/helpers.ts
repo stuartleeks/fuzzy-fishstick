@@ -171,6 +171,9 @@ export class TodoHelpers {
    * Edit a to-do item inline (by clicking on the field)
    */
   async editTodoInline(itemTitle: string, field: 'title' | 'description', newValue: string) {
+    // Wait for the page to be stable
+    await this.page.waitForLoadState('domcontentloaded');
+    
     // Find the row with the item - use a more specific selector
     const row = this.page.locator('tr', { has: this.page.locator(`.editable:has-text("${itemTitle}")`) }).first();
     
@@ -178,8 +181,14 @@ export class TodoHelpers {
     const columnClass = field === 'title' ? '.col-title' : '.col-description';
     const editableField = row.locator(`${columnClass} .editable`);
     
+    // Wait for element to be visible and ready
+    await editableField.waitFor({ state: 'visible', timeout: 5000 });
+    
     // Click to edit
     await editableField.click();
+    
+    // Wait a moment for the field to become editable
+    await this.page.waitForTimeout(200);
     
     // Clear and type new value
     await editableField.fill(newValue);
@@ -202,8 +211,11 @@ export class TodoHelpers {
     // Click delete button
     await row.locator('button[title="Delete"]').click();
     
-    // Wait for the deletion to complete
+    // Wait for the deletion to complete and element to be removed from DOM
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    
+    // Wait for the specific item to disappear
+    await this.page.waitForSelector(`text=${itemTitle}`, { state: 'detached', timeout: 5000 }).catch(() => {});
     await this.page.waitForTimeout(500);
   }
 

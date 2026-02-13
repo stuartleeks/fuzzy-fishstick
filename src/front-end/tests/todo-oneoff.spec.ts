@@ -76,13 +76,13 @@ test.describe('One-off To-Do Items', () => {
   test('should delete one-off items', async ({ page }) => {
     await helpers.addQuickTodo('Delete me', 'Will be deleted');
     
-    // Verify exists
-    await expect(page.locator('text=Delete me')).toBeVisible();
+    // Verify exists - use .first()
+    await expect(page.locator('text=Delete me').first()).toBeVisible();
     
     // Delete
     await helpers.deleteTodo('Delete me');
     
-    // Verify deleted
-    await expect(page.locator('text=Delete me')).not.toBeVisible();
+    // Verify deleted - use count instead of not.toBeVisible
+    await expect(page.locator('text=Delete me')).toHaveCount(0);
   });
 });
