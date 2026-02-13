@@ -1,6 +1,6 @@
 {
   "playwright.reuseBrowser": true,
-  "playwright.showTrace": true,
+  "playwright.showTrace": false,
   "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
   "testing.openTesting": "neverOpen",
   "[typescript]": {
