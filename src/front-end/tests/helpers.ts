@@ -39,24 +39,30 @@ export class TodoHelpers {
    */
   async addQuickTodo(title: string, description: string = '', assignee: string = '') {
     // Use the quick add row at the bottom of the table
-    const titleInput = this.page.locator('.quick-add-row input[placeholder="Type to add new item..."]');
-    await titleInput.fill(title);
+    await this.page.fill('.quick-add-row input[placeholder="Type to add new item..."]', title);
     
     if (description) {
       await this.page.fill('.quick-add-row input[placeholder="Description..."]', description);
+      // Small wait to ensure React state updates
+      await this.page.waitForTimeout(100);
     }
     if (assignee) {
       await this.page.fill('.quick-add-row input[placeholder="Assignees..."]', assignee);
+      await this.page.waitForTimeout(100);
     }
     
-    // Press Enter to submit
-    await titleInput.press('Enter');
+    // Press Enter on the last filled field (or title if only title was filled)
+    const lastField = assignee ? '.quick-add-row input[placeholder="Assignees..."]' :
+                      description ? '.quick-add-row input[placeholder="Description..."]' :
+                      '.quick-add-row input[placeholder="Type to add new item..."]';
+    
+    await this.page.press(lastField, 'Enter');
     
     // Wait for the network request to complete
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     
     // Additional wait for UI to update
-    await this.page.waitForTimeout(300);
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -75,6 +81,9 @@ export class TodoHelpers {
     // Click "Add New Item" button
     await this.page.click('button:has-text("Add New Item")');
     
+    // Wait for form to appear
+    await this.page.waitForSelector('input[placeholder="Title"]', { timeout: 5000 });
+    
     // Fill in the form
     await this.page.fill('input[placeholder="Title"]', data.title);
     
@@ -85,6 +94,8 @@ export class TodoHelpers {
     if (data.assignee) {
       await this.page.fill('input[placeholder="Add assignee (press Enter)"]', data.assignee);
       await this.page.press('input[placeholder="Add assignee (press Enter)"]', 'Enter');
+      // Wait for assignee tag to appear in the form
+      await this.page.waitForSelector('.assignee-tag', { timeout: 3000 });
     }
     
     if (data.isRecurring) {
@@ -107,11 +118,17 @@ export class TodoHelpers {
       await this.page.fill('input[type="date"]', data.dueDate);
     }
     
-    // Submit the form
-    await this.page.click('button:has-text("Add")');
+    // Submit the form using the submit button (type="submit")
+    await this.page.click('button[type="submit"]:has-text("Add")');
     
-    // Wait for the item to appear
-    await this.page.waitForSelector(`text=${data.title}`, { timeout: 5000 });
+    // Wait for the form to close (it should disappear after successful submission)
+    await this.page.waitForSelector('input[placeholder="Title"]', { state: 'detached', timeout: 10000 }).catch(() => {});
+    
+    // Wait for the network request to complete and UI to update
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    
+    // Additional wait for the table to update
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -121,8 +138,8 @@ export class TodoHelpers {
     title?: string;
     description?: string;
   }) {
-    // Find the row with the item
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    // Find the row with the item - use .first() to avoid strict mode
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     
     // Click edit button
     await row.locator('button[title="Edit"]').click();
@@ -136,11 +153,12 @@ export class TodoHelpers {
       await this.page.fill('textarea[placeholder="Description"]', newData.description);
     }
     
-    // Submit
-    await this.page.click('button:has-text("Update")');
+    // Submit using the submit button
+    await this.page.click('button[type="submit"]:has-text("Update")');
     
-    // Wait for update to complete
-    await this.page.waitForTimeout(500);
+    // Wait for update to complete with network idle
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -164,7 +182,8 @@ export class TodoHelpers {
     await editableField.press('Enter');
     
     // Wait for save to complete
-    await this.page.waitForTimeout(500);
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -177,7 +196,8 @@ export class TodoHelpers {
     // Click delete button
     await row.locator('button[title="Delete"]').click();
     
-    // Wait for the item to disappear
+    // Wait for the deletion to complete
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await this.page.waitForTimeout(500);
   }
 
@@ -185,21 +205,22 @@ export class TodoHelpers {
    * Toggle completion status of a to-do item
    */
   async toggleComplete(itemTitle: string) {
-    // Find the row with the item
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    // Find the row with the item - use .first() to avoid strict mode
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     
     // Click the checkbox
     await row.locator('input[type="checkbox"]').first().click();
     
-    // Wait for the update
-    await this.page.waitForTimeout(500);
+    // Wait for the update with network idle
+    await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    await this.page.waitForTimeout(300);
   }
 
   /**
    * Check if item is completed
    */
   async isCompleted(itemTitle: string): Promise<boolean> {
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     const checkbox = row.locator('input[type="checkbox"]').first();
     return await checkbox.isChecked();
   }
@@ -216,8 +237,8 @@ export class TodoHelpers {
    * Drag and drop to reorder items
    */
   async reorderTodo(fromTitle: string, toTitle: string) {
-    const fromRow = this.page.locator('tr', { has: this.page.locator(`text="${fromTitle}"`) });
-    const toRow = this.page.locator('tr', { has: this.page.locator(`text="${toTitle}"`) });
+    const fromRow = this.page.locator('tr', { has: this.page.locator(`text="${fromTitle}"`) }).first();
+    const toRow = this.page.locator('tr', { has: this.page.locator(`text="${toTitle}"`) }).first();
     
     await fromRow.hover();
     await this.page.mouse.down();
@@ -237,16 +258,17 @@ export class TodoHelpers {
    * Get assignees for a to-do item
    */
   async getAssignees(itemTitle: string): Promise<string[]> {
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     const assigneeTags = await row.locator('.assignee-tag, .assignee-badge-small').allTextContents();
-    return assigneeTags.map(tag => tag.trim()).filter(tag => tag !== '');
+    // Strip emoji prefix (👤 ) and trim whitespace
+    return assigneeTags.map(tag => tag.replace(/^👤\s*/, '').trim()).filter(tag => tag !== '');
   }
 
   /**
    * Check if item has recurring badge
    */
   async hasRecurringBadge(itemTitle: string): Promise<boolean> {
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     const badge = row.locator('text=🔄');
     return await badge.count() > 0;
   }
@@ -255,7 +277,7 @@ export class TodoHelpers {
    * Edit recurring definition
    */
   async editRecurringDefinition(itemTitle: string) {
-    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) });
+    const row = this.page.locator('tr', { has: this.page.locator(`text="${itemTitle}"`) }).first();
     
     // Click edit button first
     await row.locator('button[title="Edit"]').click();

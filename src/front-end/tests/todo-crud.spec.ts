@@ -13,9 +13,9 @@ test.describe('To-Do CRUD Operations', () => {
   test('should add a new to-do item using quick add', async ({ page }) => {
     await helpers.addQuickTodo('Buy groceries', 'Milk, bread, eggs');
     
-    // Verify the item appears
-    await expect(page.locator('text=Buy groceries')).toBeVisible();
-    await expect(page.locator('text=Milk, bread, eggs')).toBeVisible();
+    // Verify the item appears - use .first() to avoid strict mode
+    await expect(page.locator('text=Buy groceries').first()).toBeVisible();
+    await expect(page.locator('text=Milk, bread, eggs').first()).toBeVisible();
   });
 
   test('should add a new to-do item using the form', async ({ page }) => {
@@ -25,9 +25,9 @@ test.describe('To-Do CRUD Operations', () => {
       assignee: 'alice@example.com'
     });
     
-    // Verify the item appears with all details
-    await expect(page.locator('text=Complete project')).toBeVisible();
-    await expect(page.locator('text=Finish the Playwright tests')).toBeVisible();
+    // Verify the item appears with all details - use .first()
+    await expect(page.locator('text=Complete project').first()).toBeVisible();
+    await expect(page.locator('text=Finish the Playwright tests').first()).toBeVisible();
     
     // Check assignee
     const assignees = await helpers.getAssignees('Complete project');
@@ -44,9 +44,9 @@ test.describe('To-Do CRUD Operations', () => {
       description: 'Updated description'
     });
     
-    // Verify the changes
-    await expect(page.locator('text=Updated title')).toBeVisible();
-    await expect(page.locator('text=Updated description')).toBeVisible();
+    // Verify the changes - use .first()
+    await expect(page.locator('text=Updated title').first()).toBeVisible();
+    await expect(page.locator('text=Updated description').first()).toBeVisible();
     await expect(page.locator('text=Original title')).not.toBeVisible();
   });
 
@@ -57,8 +57,8 @@ test.describe('To-Do CRUD Operations', () => {
     // Edit title inline
     await helpers.editTodoInline('Test item', 'title', 'Edited inline title');
     
-    // Verify the change
-    await expect(page.locator('text=Edited inline title')).toBeVisible();
+    // Verify the change - use .first()
+    await expect(page.locator('text=Edited inline title').first()).toBeVisible();
     await expect(page.locator('text=Test item')).not.toBeVisible();
   });
 
@@ -81,9 +81,9 @@ test.describe('To-Do CRUD Operations', () => {
     await helpers.addQuickTodo('Second item', 'Description 2');
     await helpers.addQuickTodo('Third item', 'Description 3');
     
-    // Verify all items are present
-    await expect(page.locator('text=First item')).toBeVisible();
-    await expect(page.locator('text=Second item')).toBeVisible();
-    await expect(page.locator('text=Third item')).toBeVisible();
+    // Verify all items are present - use .first()
+    await expect(page.locator('text=First item').first()).toBeVisible();
+    await expect(page.locator('text=Second item').first()).toBeVisible();
+    await expect(page.locator('text=Third item').first()).toBeVisible();
   });
 });
