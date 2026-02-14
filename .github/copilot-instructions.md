@@ -5,6 +5,7 @@
 fuzzy-fishstick is a To-Do List application with a React frontend and Go backend API.
 
 ### Key Features
+
 - Add, edit, and delete to-do items
 - Assign items to multiple people
 - Support for one-off and recurring items
@@ -15,6 +16,7 @@ fuzzy-fishstick is a To-Do List application with a React frontend and Go backend
 ## Architecture
 
 ### Backend
+
 - **Language**: Go 1.24+
 - **Framework**: Gorilla Mux for HTTP routing
 - **Storage**: In-memory (data resets on server restart)
@@ -22,6 +24,7 @@ fuzzy-fishstick is a To-Do List application with a React frontend and Go backend
 - **Location**: `src/back-end/`
 
 ### Frontend
+
 - **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite
 - **UI Libraries**: @hello-pangea/dnd for drag and drop
@@ -32,6 +35,7 @@ fuzzy-fishstick is a To-Do List application with a React frontend and Go backend
 ## Development Commands
 
 ### Backend (Go)
+
 ```bash
 cd src/back-end
 
@@ -48,6 +52,7 @@ go build -o todo-api main.go
 ```
 
 ### Frontend (React/TypeScript)
+
 ```bash
 cd src/front-end
 
@@ -68,6 +73,7 @@ npm run preview
 ```
 
 ### Docker
+
 ```bash
 # Build all images
 make docker-build-all
@@ -79,8 +85,9 @@ docker-compose up -d
 ## Code Style and Conventions
 
 ### TypeScript/React Frontend
+
 - **Strict mode enabled**: TypeScript compiler is configured with `strict: true`
-- **Type safety**: 
+- **Type safety**:
   - Use `noUncheckedIndexedAccess: true` - always check array bounds
   - No implicit any types
   - Define types in `src/front-end/src/types.ts`
@@ -97,12 +104,13 @@ docker-compose up -d
   - Styles in `src/front-end/src/App.css`
 
 ### Go Backend
+
 - **Go version**: 1.24.12
 - **Package**: `github.com/stuartleeks/fuzzy-fishstick`
 - **Code style**: Follow standard Go conventions (gofmt)
 - **Error handling**: Always return and handle errors explicitly
 - **Concurrency**: Use mutexes for thread-safe data access (see Store struct)
-- **Validation**: 
+- **Validation**:
   - Validate all input data in API handlers
   - Return HTTP 400 with clear error messages for validation failures
   - Check required fields (title is required)
@@ -113,9 +121,11 @@ docker-compose up -d
 ## API Design Patterns
 
 ### RESTful Endpoints
+
 All API endpoints are prefixed with `/api/`
 
 **To-Do Items:**
+
 - `GET /api/todos` - List all to-do items
 - `POST /api/todos` - Create a new to-do item
 - `PUT /api/todos/{id}` - Update a to-do item
@@ -124,6 +134,7 @@ All API endpoints are prefixed with `/api/`
 - `POST /api/todos/{id}/convert-recurring` - Convert to/from recurring
 
 **Recurring Item Definitions:**
+
 - `GET /api/recurring` - List all recurring item definitions
 - `POST /api/recurring` - Create a recurring item definition
 - `PUT /api/recurring/{id}` - Update a recurring item definition
@@ -132,6 +143,7 @@ All API endpoints are prefixed with `/api/`
 ### Data Models
 
 **TodoItem:**
+
 ```go
 type TodoItem struct {
     ID              int                `json:"id"`
@@ -149,6 +161,7 @@ type TodoItem struct {
 ```
 
 **RecurringItemDefinition:**
+
 ```go
 type RecurringItemDefinition struct {
     ID          int                `json:"id"`
@@ -162,6 +175,7 @@ type RecurringItemDefinition struct {
 ```
 
 **RecurrencePattern:**
+
 ```go
 type RecurrencePattern struct {
     Frequency  string   `json:"frequency"`  // "daily", "weekly", "monthly"
@@ -171,6 +185,7 @@ type RecurrencePattern struct {
 ```
 
 ### CORS Configuration
+
 - All origins allowed (`Access-Control-Allow-Origin: *`)
 - Methods: GET, POST, PUT, DELETE, OPTIONS
 - Headers: Content-Type
@@ -178,12 +193,14 @@ type RecurrencePattern struct {
 ## Important Conventions
 
 ### Multiple Assignees
+
 - The `AssignedTo` field is an **array of strings** (`[]string`), not a single string
 - Support multiple people assigned to the same item
 - Display assignees as blue badges in the UI
 - Allow inline editing to add/remove assignees
 
 ### Recurring Items
+
 - Recurring items have a separate definition (RecurringItemDefinition)
 - Individual instances are TodoItems with `IsRecurring: true` and a `RecurrenceID`
 - Editing an instance edits only that instance
@@ -191,12 +208,14 @@ type RecurrencePattern struct {
 - Recurring badge (🔄) displays in the due date column
 
 ### Inline Editing
+
 - Table fields support inline editing: title, description, assignedTo, dueDate
 - Click field to edit, Enter/blur to save, Escape to cancel
 - Editable cells use `display: block` and `width: 100%` for full click targets
 - Minimum height of 2rem ensures clickability even with empty content
 
 ### Date Handling
+
 - Backend uses Go's `time.Time`
 - Frontend stores dates in YYYY-MM-DD format
 - Converted to ISO 8601 for API communication
@@ -205,6 +224,7 @@ type RecurrencePattern struct {
 ## Files and Directories
 
 ### Do Not Modify
+
 - `node_modules/` - Frontend dependencies (auto-generated)
 - `dist/` - Frontend build output (auto-generated)
 - `go.sum` - Go dependencies checksum (managed by go mod)
@@ -212,6 +232,7 @@ type RecurrencePattern struct {
 - Docker-related files unless explicitly requested
 
 ### Key Files to Understand
+
 - `src/back-end/main.go` - All backend logic in a single file
 - `src/front-end/src/App.tsx` - Main React component
 - `src/front-end/src/types.ts` - TypeScript type definitions
@@ -219,21 +240,133 @@ type RecurrencePattern struct {
 - `Makefile` - Common development commands
 - `docker-compose.yml` - Container orchestration
 
-## Testing Guidelines
+## Testing
 
-Currently, this project does not have automated tests. When adding tests:
+### Test Framework
 
-### Backend Testing
-- Use Go's built-in testing framework (`testing` package)
-- Test files should be named `*_test.go`
-- Place tests alongside the code they test
-- Test API handlers, validation logic, and data operations
+- **Framework**: Playwright (end-to-end tests)
+- **Location**: `src/front-end/tests/`
+- **Config**: `src/front-end/playwright.config.ts`
+- **Test helpers**: `src/front-end/tests/helpers.ts` — `TodoHelpers` class with common actions (login, add/edit/delete items, etc.)
 
-### Frontend Testing
-- If adding tests, use a framework compatible with React 19 and Vite
-- Consider Vitest for unit tests (integrates well with Vite)
-- Test components, hooks, and utility functions
-- Mock API calls using axios-mock-adapter or similar
+### Test Files
+
+- `smoke.spec.ts` — Basic app loading and login
+- `todo-crud.spec.ts` — Create, read, update, delete operations
+- `todo-assignees.spec.ts` — Assignee management
+- `todo-completion.spec.ts` — Marking items complete/incomplete
+- `todo-oneoff.spec.ts` — One-off (non-recurring) items
+- `todo-recurring.spec.ts` — Recurring item operations
+- `todo-reordering.spec.ts` — Drag and drop reordering
+
+### Running Tests
+
+**Preferred method — use `npm test` from `src/front-end/`:**
+
+```bash
+cd src/front-end && npm test
+```
+
+This runs `playwright test`, which **automatically starts and stops both the backend (port 8080) and frontend (port 5173) servers** via the `webServer` config in `playwright.config.ts`. You do NOT need to start the servers manually.
+
+**Other test commands:**
+
+```bash
+cd src/front-end
+npm run test:headed    # Run with visible browser
+npm run test:ui        # Interactive UI mode
+npm run test:report    # Show HTML test report
+```
+
+**VS Code tasks are also available** (see `.vscode/tasks.json`):
+
+- "Run Playwright Tests" — default test task
+- "Run Playwright Tests (Headed)" — with visible browser
+- "Run Playwright Tests (UI Mode)" — interactive
+- "Show Playwright Test Report" — view last report
+- "Install Playwright Browsers" — first-time setup
+
+**Make targets:**
+
+```bash
+make test          # Run all tests
+make test-headed   # Headed mode
+make test-ui       # UI mode
+```
+
+### Server Lifecycle During Tests
+
+The Playwright config (`playwright.config.ts`) defines two `webServer` entries:
+
+1. **Backend**: `cd ../back-end && go run main.go` on port 8080
+2. **Frontend**: `npm run dev` on port 5173
+
+Both have `reuseExistingServer: false`, meaning **Playwright always starts fresh server instances** and kills them when tests finish. This ensures clean state (the backend uses in-memory storage).
+
+### Before Running Tests — Check for Port Conflicts
+
+If you get errors about ports already in use, servers may already be running from a previous session or manual start. **Before running tests, check and stop any existing servers:**
+
+```bash
+# Check if backend (8080) or frontend (5173) are already running
+lsof -ti:8080
+lsof -ti:5173
+
+# Kill processes on those ports if any are found
+lsof -ti:8080 | xargs kill -9 2>/dev/null
+lsof -ti:5173 | xargs kill -9 2>/dev/null
+
+# Or use the Makefile shortcut
+make kill
+```
+
+If the servers were started via VS Code tasks ("Start Backend Server", "Start Frontend Server"), terminate those tasks before running tests.
+
+### Running Tests for a Specific File
+
+```bash
+cd src/front-end && npx playwright test tests/smoke.spec.ts
+```
+
+### Installing Playwright Browsers (First-Time Setup)
+
+```bash
+cd src/front-end && npx playwright install --with-deps
+```
+
+Or use the VS Code task "Install Playwright Browsers".
+
+### Test Configuration Details
+
+- **Parallelism**: Disabled (`fullyParallel: false`, `workers: 1`) — tests run sequentially
+- **Timeout**: 60 seconds per test, 5 seconds per action
+- **Browser**: Chromium only (Firefox/WebKit commented out)
+- **Retries**: 0 locally, 2 on CI
+- **Traces**: Collected on first retry
+- **Base URL**: `http://localhost:5173`
+
+### Starting Servers Manually (for Development, NOT for Tests)
+
+If you want to run the app manually (not for testing), use:
+
+```bash
+# Terminal 1: Backend
+cd src/back-end && go run main.go
+
+# Terminal 2: Frontend
+cd src/front-end && npm run dev
+```
+
+Or use the VS Code tasks "Start Backend Server" and "Start Frontend Server", or `make run`.
+
+**Important**: Stop these servers before running Playwright tests since `reuseExistingServer: false` means Playwright will fail if the ports are already occupied.
+
+### Backend Testing (Go)
+
+- Currently no Go unit tests
+- When adding tests, use Go's built-in `testing` package
+- Test files should be named `*_test.go` and placed alongside `main.go`
+- Test API handlers, validation logic, and store operations
 
 ## CI/CD
 
@@ -244,6 +377,7 @@ The project uses GitHub Actions:
 - **Dev Container**: Build devcontainer image (`.github/workflows/devcontainer.yml`)
 
 Published images are available at:
+
 - `ghcr.io/stuartleeks/fuzzy-fishstick/backend:latest`
 - `ghcr.io/stuartleeks/fuzzy-fishstick/frontend:latest`
 - `ghcr.io/stuartleeks/fuzzy-fishstick/devcontainer:latest`
@@ -276,7 +410,10 @@ Published images are available at:
 ## Summary for Copilot
 
 When working on this repository:
+
 - **Always run linters** before finalizing changes (`npm run lint` for frontend)
+- **Ensure tests pass** after making changes — run `cd src/front-end && npm test` (this auto-starts servers). If servers are already running on ports 8080/5173, stop them first with `make kill` or `lsof -ti:8080 -ti:5173 | xargs kill -9 2>/dev/null`
+- **Add tests for new behaviours** — create or extend Playwright specs in `src/front-end/tests/` for any new features or changed functionality. Use the `TodoHelpers` class from `tests/helpers.ts` for common actions
 - **Test locally** using `make backend` and `make frontend` or `npm run dev` and `go run main.go`
 - **Follow TypeScript strict mode** - no implicit any, check array bounds
 - **Use array for AssignedTo** field, not a single string
