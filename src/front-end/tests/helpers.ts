@@ -276,6 +276,11 @@ export class TodoHelpers {
       })
       .first();
 
+    // Handle the confirmation dialog
+    this.page.once("dialog", async (dialog) => {
+      await dialog.accept();
+    });
+
     // Click delete button
     await row.locator('button[title="Delete"]').click();
 
