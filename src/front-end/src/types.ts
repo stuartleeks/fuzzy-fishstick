@@ -52,3 +52,14 @@ export interface ReorderItem {
   id: number
   position: number
 }
+
+export interface FilterState {
+  assignedToUser: string // Empty string means no assignee filter
+  showUnassigned: boolean
+  dueDateFilters: {
+    overdue: boolean
+    today: boolean
+    tomorrow: boolean
+    future: boolean
+  }
+}
