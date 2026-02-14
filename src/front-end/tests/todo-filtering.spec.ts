@@ -13,18 +13,18 @@ test.describe("To-Do Item Filtering", () => {
   test("should show filter controls", async ({ page }) => {
     // Check that filter section is visible
     await expect(page.locator(".filter-section")).toBeVisible();
-    await expect(
-      page.locator('h3:has-text("Filter Items")'),
-    ).toBeVisible();
+    await expect(page.locator('h3:has-text("Filter Items")')).toBeVisible();
+
+    // Toggle the filter section to ensure controls are visible
+    await page.click(".btn-collapse");
+    await expect(page.locator(".filter-controls")).toBeVisible();
 
     // Check assignee filter controls
     await expect(
       page.locator('button:has-text("Assigned to me")'),
     ).toBeVisible();
     await expect(page.locator(".filter-select")).toBeVisible();
-    await expect(
-      page.locator('text="Include unassigned"'),
-    ).toBeVisible();
+    await expect(page.locator('text="Include unassigned"')).toBeVisible();
 
     // Check due date filter controls
     await expect(page.locator('text="🔴 Overdue"')).toBeVisible();
@@ -109,7 +109,9 @@ test.describe("To-Do Item Filtering", () => {
     await expect(page.locator("text=Unassigned Task")).toBeVisible();
 
     // Uncheck "Include unassigned"
-    await page.uncheck('input[type="checkbox"]:near(:text("Include unassigned"))');
+    await page.uncheck(
+      'input[type="checkbox"]:near(:text("Include unassigned"))',
+    );
     await page.waitForLoadState("networkidle");
 
     // Only assigned task should be visible
@@ -347,62 +349,62 @@ test.describe("To-Do Item Filtering", () => {
   test("should collapse and expand filter section", async ({ page }) => {
     // Filter controls should be visible initially
     await expect(page.locator(".filter-controls")).toBeVisible();
-    
+
     // Find and click the collapse button
     const collapseBtn = page.locator(".btn-collapse");
     await expect(collapseBtn).toBeVisible();
     await collapseBtn.click();
-    
+
     // Filter controls should be hidden
     await expect(page.locator(".filter-controls")).not.toBeVisible();
-    
+
     // Button should show down arrow
     await expect(collapseBtn).toHaveText("▼");
-    
+
     // Click again to expand
     await collapseBtn.click();
-    
+
     // Filter controls should be visible again
     await expect(page.locator(".filter-controls")).toBeVisible();
-    
+
     // Button should show up arrow
     await expect(collapseBtn).toHaveText("▲");
   });
 
   test("should persist filter state across page reloads", async ({ page }) => {
     const today = new Date();
-    
+
     // Add a test task
     await helpers.addTodoWithForm({
       title: "Task for Alice",
       assignedTo: ["alice@example.com"],
       dueDate: today.toISOString().split("T")[0],
     });
-    
+
     // Apply filters
     await page.click('button:has-text("Assigned to me")');
     await page.check('input[type="checkbox"]:near(:text("📅 Today"))');
     await page.waitForLoadState("networkidle");
-    
+
     // Collapse the filter section
     await page.click(".btn-collapse");
     await expect(page.locator(".filter-controls")).not.toBeVisible();
-    
+
     // Reload the page
     await page.reload();
     await page.waitForLoadState("networkidle");
-    
+
     // Filters should still be applied
     const select = page.locator(".filter-select");
     await expect(select).toHaveValue("alice@example.com");
     await expect(
       page.locator('input[type="checkbox"]:near(:text("📅 Today"))'),
     ).toBeChecked();
-    
+
     // Filter section should still be collapsed
     await expect(page.locator(".filter-controls")).not.toBeVisible();
     await expect(page.locator(".btn-collapse")).toHaveText("▼");
-    
+
     // Task should still be visible (filters are applied)
     await expect(page.locator("text=Task for Alice")).toBeVisible();
   });

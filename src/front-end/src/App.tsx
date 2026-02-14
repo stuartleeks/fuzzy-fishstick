@@ -95,7 +95,7 @@ function App() {
         tomorrow: false,
         future: false,
       },
-      isCollapsed: false,
+      isCollapsed: true,
     }
   })
 
@@ -181,21 +181,21 @@ function App() {
 
   // Helper function to determine if a date is overdue, today, tomorrow, or future
   const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
-  
+
   const getDateCategory = (dateStr?: string): 'overdue' | 'today' | 'tomorrow' | 'future' | 'none' => {
     if (!dateStr) return 'none'
-    
+
     // Use date-only comparison to avoid timezone issues
     // Extract date parts from the ISO date string (YYYY-MM-DD)
     const [year, month, day] = dateStr.split('T')[0].split('-').map(Number)
     const itemDate = new Date(year, month - 1, day) // month is 0-indexed
-    
+
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    
+
     const diffMs = itemDate.getTime() - today.getTime()
     const diffDays = Math.floor(diffMs / MILLISECONDS_PER_DAY)
-    
+
     if (diffDays < 0) return 'overdue'
     if (diffDays === 0) return 'today'
     if (diffDays === 1) return 'tomorrow'
@@ -219,20 +219,20 @@ function App() {
       // Filter by due date categories
       const { overdue, today, tomorrow, future } = filterState.dueDateFilters
       const anyDateFilterActive = overdue || today || tomorrow || future
-      
+
       if (anyDateFilterActive) {
         const category = getDateCategory(todo.dueDate)
-        
+
         // If no due date and any date filter is active, exclude the item
         if (category === 'none') return false
-        
+
         // Check if the item's category matches any active filter
-        const matchesFilter = 
+        const matchesFilter =
           (overdue && category === 'overdue') ||
           (today && category === 'today') ||
           (tomorrow && category === 'tomorrow') ||
           (future && category === 'future')
-        
+
         if (!matchesFilter) return false
       }
 
@@ -906,7 +906,7 @@ function App() {
               {filterState.isCollapsed ? '▼' : '▲'}
             </button>
           </div>
-          
+
           {!filterState.isCollapsed && (
             <div className="filter-controls">
               {/* Assignee Filter */}
