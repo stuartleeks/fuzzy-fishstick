@@ -246,17 +246,20 @@ export class TodoHelpers {
     // Wait for element to be visible and ready
     await editableField.waitFor({ state: "visible", timeout: 5000 });
 
-    // Click to edit
+    // Click to edit - this replaces the .editable span with an <input>
     await editableField.click();
 
-    // Wait a moment for the field to become editable
-    await this.page.waitForTimeout(200);
+    // After clicking, the .editable span is replaced by an <input> and the
+    // row locator (which depends on .editable) no longer matches.
+    // Target the now-focused input directly.
+    const inputField = this.page.locator(`${columnClass} input:focus`);
+    await inputField.waitFor({ state: "visible", timeout: 5000 });
 
     // Clear and type new value
-    await editableField.fill(newValue);
+    await inputField.fill(newValue);
 
     // Press Enter to save
-    await editableField.press("Enter");
+    await inputField.press("Enter");
 
     // Wait for save to complete
     await this.page
