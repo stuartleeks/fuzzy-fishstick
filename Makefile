@@ -27,6 +27,10 @@ backend: ## Run the back-end server
 run: ## Run both front-end and back-end concurrently
 	$(MAKE) backend & $(MAKE) frontend
 
+kill: ## Kill all running backend and frontend processes
+	lsof -ti:8080 | xargs kill -9 2>/dev/null
+	lsof -ti:5173 | xargs kill -9 2>/dev/null
+
 test: ## Run Playwright tests
 	cd src/front-end && npm test
 

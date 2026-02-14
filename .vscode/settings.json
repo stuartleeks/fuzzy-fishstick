@@ -1,5 +1,5 @@
 {
-  "playwright.reuseBrowser": true,
+  "playwright.reuseBrowser": false,
   "playwright.showTrace": false,
   "testing.automaticallyOpenPeekView": "failureInVisibleDocument",
   "testing.openTesting": "neverOpen",

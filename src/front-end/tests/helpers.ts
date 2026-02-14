@@ -337,7 +337,7 @@ export class TodoHelpers {
    */
   async getTodoTitles(): Promise<string[]> {
     const titles = await this.page
-      .locator(".todo-table tbody tr:not(.quick-add-row) .editable")
+      .locator(".todo-table tbody tr:not(.quick-add-row) .col-title .editable")
       .allTextContents();
     return titles.filter((title) => title.trim() !== "");
   }
@@ -445,6 +445,11 @@ export class TodoHelpers {
             break; // Really done
           }
         }
+
+        // Handle the confirmation dialog before clicking delete
+        this.page.once("dialog", async (dialog) => {
+          await dialog.accept();
+        });
 
         // Click the first delete button
         await deleteButtons.first().click({ timeout: 3000 });
