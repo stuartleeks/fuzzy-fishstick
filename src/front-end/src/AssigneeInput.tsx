@@ -111,7 +111,10 @@ export function AssigneeInput({
                 <div
                   key={idx}
                   className="autocomplete-item"
-                  onClick={() => handleSelectSuggestion(suggestion)}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    handleSelectSuggestion(suggestion)
+                  }}
                 >
                   👤 {suggestion}
                 </div>

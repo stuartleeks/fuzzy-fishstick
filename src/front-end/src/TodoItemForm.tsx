@@ -2,6 +2,52 @@ import { useState, useEffect } from 'react'
 import type { FormData, TodoItem, RecurringItemDefinition } from './types'
 import { AssigneeInput } from './AssigneeInput'
 
+// Day name to weekday number mapping for recurring patterns
+const DAY_MAP: { [key: string]: number } = {
+  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+  'Thursday': 4, 'Friday': 5, 'Saturday': 6
+}
+
+// Maximum days to search ahead when finding next weekly occurrence
+const MAX_DAYS_TO_SEARCH = 14
+
+// Calculate next occurrence date for a recurring item
+const calculateNextInstanceDate = (
+  currentDueDate: string,
+  pattern: { frequency: string; interval: number; daysOfWeek?: string[] }
+): Date | null => {
+  if (!currentDueDate) return null
+
+  const current = new Date(currentDueDate)
+  let nextDate = new Date(current)
+
+  switch (pattern.frequency) {
+    case 'daily':
+      nextDate.setDate(current.getDate() + pattern.interval)
+      break
+    case 'weekly':
+      if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+        const targetDays = pattern.daysOfWeek.map(d => DAY_MAP[d]).filter(d => d !== undefined)
+        for (let i = 1; i <= MAX_DAYS_TO_SEARCH; i++) {
+          const testDate = new Date(current)
+          testDate.setDate(current.getDate() + i)
+          if (targetDays.includes(testDate.getDay())) {
+            nextDate = testDate
+            break
+          }
+        }
+      } else {
+        nextDate.setDate(current.getDate() + (7 * pattern.interval))
+      }
+      break
+    case 'monthly':
+      nextDate.setMonth(current.getMonth() + pattern.interval)
+      break
+  }
+
+  return nextDate
+}
+
 export interface TodoItemFormProps {
   formData: FormData
   onFormDataChange: (data: FormData) => void
@@ -59,51 +105,6 @@ export function TodoItemForm({
     }
     setMaxDate(undefined)
   }, [formData.isRecurring, editingId, todos, recurringDefs])
-
-  // Day name to weekday number mapping for recurring patterns
-  const DAY_MAP: { [key: string]: number } = {
-    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-    'Thursday': 4, 'Friday': 5, 'Saturday': 6
-  }
-
-  // Maximum days to search ahead when finding next weekly occurrence
-  const MAX_DAYS_TO_SEARCH = 14
-
-  const calculateNextInstanceDate = (
-    currentDueDate: string,
-    pattern: { frequency: string; interval: number; daysOfWeek?: string[] }
-  ): Date | null => {
-    if (!currentDueDate) return null
-
-    const current = new Date(currentDueDate)
-    let nextDate = new Date(current)
-
-    switch (pattern.frequency) {
-      case 'daily':
-        nextDate.setDate(current.getDate() + pattern.interval)
-        break
-      case 'weekly':
-        if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
-          const targetDays = pattern.daysOfWeek.map(d => DAY_MAP[d]).filter(d => d !== undefined)
-          for (let i = 1; i <= MAX_DAYS_TO_SEARCH; i++) {
-            const testDate = new Date(current)
-            testDate.setDate(current.getDate() + i)
-            if (targetDays.includes(testDate.getDay())) {
-              nextDate = testDate
-              break
-            }
-          }
-        } else {
-          nextDate.setDate(current.getDate() + (7 * pattern.interval))
-        }
-        break
-      case 'monthly':
-        nextDate.setMonth(current.getMonth() + pattern.interval)
-        break
-    }
-
-    return nextDate
-  }
 
   const handleAssigneeChange = (assignees: string[]): void => {
     onFormDataChange({ ...formData, assignedTo: assignees })
