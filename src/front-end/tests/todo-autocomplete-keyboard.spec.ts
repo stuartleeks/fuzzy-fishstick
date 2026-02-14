@@ -279,6 +279,9 @@ test.describe('To-Do Assignee Autocomplete Keyboard Navigation', () => {
       await assigneeInput.press('ArrowDown');
       await assigneeInput.press('Enter');
       
+      // Wait for the selection to process before typing more
+      await page.waitForTimeout(200);
+      
       // Now add another assignee
       await assigneeInput.type('bob');
       

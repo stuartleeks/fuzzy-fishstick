@@ -1121,7 +1121,8 @@ function App() {
                           value={newRowData.assignedTo}
                           onChange={(e) => {
                             setNewRowData({ ...newRowData, assignedTo: e.target.value })
-                            setShowQuickAddAutocomplete(e.target.value.length > 0 && e.target.value.split(',').pop()?.trim().length! > 0)
+                            const lastEntry = e.target.value.split(',').pop()?.trim() ?? ''
+                            setShowQuickAddAutocomplete(e.target.value.length > 0 && lastEntry.length > 0)
                             setQuickAddAutocompleteIndex(-1)
                           }}
                           onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
