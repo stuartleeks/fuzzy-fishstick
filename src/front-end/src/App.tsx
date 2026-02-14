@@ -118,7 +118,7 @@ function App() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
-    
+
     try {
       if (editingRecurringDefId) {
         // Update recurring definition
@@ -137,7 +137,7 @@ function App() {
       } else if (editingId) {
         // Check if we need to convert to/from recurring
         const currentTodo = todos.find(t => t.id === editingId)
-        
+
         if (formData.isRecurring && !currentTodo?.isRecurring) {
           // Convert to recurring
           await axios.post(`${API_BASE}/todos/${editingId}/convert-recurring`, {
@@ -197,7 +197,7 @@ function App() {
           dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
         })
       }
-      
+
       await loadTodos()
       resetForm()
     } catch (error) {
@@ -228,20 +228,20 @@ function App() {
     'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
     'Thursday': 4, 'Friday': 5, 'Saturday': 6
   }
-  
+
   // Maximum days to search ahead when finding next weekly occurrence
   const MAX_DAYS_TO_SEARCH = 14 // 2 weeks to handle all weekly patterns
-  
+
   // Delay before saving inline edits on blur (allows remove button clicks to process first)
   const INLINE_EDIT_BLUR_DELAY = 200 // milliseconds
 
   // Calculate next occurrence date for a recurring item (used for validation)
   const calculateNextInstanceDate = (currentDueDate: string, pattern: { frequency: string; interval: number; daysOfWeek?: string[] }): Date | null => {
     if (!currentDueDate) return null
-    
+
     const current = new Date(currentDueDate)
     let nextDate = new Date(current)
-    
+
     switch (pattern.frequency) {
       case 'daily':
         nextDate.setDate(current.getDate() + pattern.interval)
@@ -250,7 +250,7 @@ function App() {
         if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
           // For weekly with specific days, find the next matching day
           const targetDays = pattern.daysOfWeek.map(d => DAY_MAP[d]).filter(d => d !== undefined)
-          
+
           // Find next occurrence
           for (let i = 1; i <= MAX_DAYS_TO_SEARCH; i++) {
             const testDate = new Date(current)
@@ -268,19 +268,19 @@ function App() {
         nextDate.setMonth(current.getMonth() + pattern.interval)
         break
     }
-    
+
     return nextDate
   }
 
   const handleEdit = async (todo: TodoItem): Promise<void> => {
     // Track if the item was originally recurring
     setOriginallyRecurring(todo.isRecurring || false)
-    
+
     // If editing a recurring item, fetch its definition to get pattern details
     let frequency: 'daily' | 'weekly' | 'monthly' = 'daily'
     let interval: string = '1'
     let daysOfWeek: string[] = []
-    
+
     if (todo.isRecurring && todo.recurrenceId) {
       try {
         const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
@@ -293,10 +293,19 @@ function App() {
         console.error('Error loading recurrence pattern:', error)
       }
     }
-    
+
     // Format due date for input field (YYYY-MM-DD)
-    const dueDate = todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : ''
-    
+    function formatDueDateForInput(dueDate?: string): string {
+      if (!dueDate) return ''
+      const date = new Date(dueDate)
+      if (isNaN(date.getTime())) {
+        console.error('Invalid due date:', dueDate)
+        return ''
+      }
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    }
+    const dueDate: string = formatDueDateForInput(todo.dueDate)
+
     setFormData({
       title: todo.title,
       description: todo.description,
@@ -314,11 +323,11 @@ function App() {
 
   const handleEditRecurringDefinition = async (todo: TodoItem): Promise<void> => {
     if (!todo.recurrenceId) return
-    
+
     try {
       const recDef = recurringDefs.find(def => def.id === todo.recurrenceId)
       if (!recDef) return
-      
+
       // Load the recurring definition for editing
       setFormData({
         title: recDef.title,
@@ -395,7 +404,7 @@ function App() {
           }
           updatedTodo.dueDate = date.toISOString()
         } else {
-          updatedTodo.dueDate = null // Clear the due date if empty
+          updatedTodo.dueDate = undefined // Clear the due date if empty
         }
       }
       await axios.put(`${API_BASE}/todos/${todo.id}`, updatedTodo)
@@ -416,7 +425,7 @@ function App() {
 
   const handleDelete = async (id: number): Promise<void> => {
     if (!window.confirm('Are you sure you want to delete this item?')) return
-    
+
     try {
       await axios.delete(`${API_BASE}/todos/${id}`)
       await loadTodos()
@@ -442,6 +451,8 @@ function App() {
 
     const items = Array.from(todos)
     const [reorderedItem] = items.splice(result.source.index, 1)
+    if (!reorderedItem)
+      return
     items.splice(result.destination.index, 0, reorderedItem)
 
     // Update local state optimistically
@@ -462,21 +473,9 @@ function App() {
     }
   }
 
-  const handleDeleteRecurring = async (id: number): Promise<void> => {
-    if (!window.confirm('Delete this recurring item definition?')) return
-    
-    try {
-      await axios.delete(`${API_BASE}/recurring/${id}`)
-      await loadRecurringDefs()
-      await loadTodos()
-    } catch (error) {
-      console.error('Error deleting recurring definition:', error)
-    }
-  }
-
   const handleQuickAdd = async (): Promise<void> => {
     if (!newRowData.title.trim()) return
-    
+
     try {
       await axios.post(`${API_BASE}/todos`, {
         title: newRowData.title,
@@ -541,7 +540,7 @@ function App() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="input textarea"
               />
-              
+
               <div className="assignee-section">
                 <div className="assignee-input-group">
                   <div style={{ position: 'relative', flex: 1 }}>
@@ -586,8 +585,8 @@ function App() {
                 {formData.assignedTo.length > 0 && (
                   <div className="assignee-tags">
                     {formData.assignedTo.map((person, index) => (
-                      <span 
-                        key={index} 
+                      <span
+                        key={index}
                         className={`assignee-tag ${person === user?.email ? 'current-user' : ''}`}
                       >
                         👤 {person}
@@ -603,7 +602,7 @@ function App() {
                   </div>
                 )}
               </div>
-              
+
               {/* Recurring checkbox - disabled when editing a recurring instance */}
               <label className="checkbox-label">
                 <input
@@ -620,8 +619,8 @@ function App() {
                 )}
               </label>
 
-              {/* Show recurrence pattern only when creating/editing recurring definition */}
-              {formData.isRecurring && editingRecurringDefId && (
+              {/* Show recurrence pattern when creating new recurring item or editing recurring definition */}
+              {formData.isRecurring && (editingRecurringDefId || !editingId) && (
                 <div className="recurring-options">
                   <select
                     value={formData.frequency}
@@ -643,7 +642,7 @@ function App() {
                 </div>
               )}
 
-              {formData.isRecurring && editingRecurringDefId && formData.frequency === 'weekly' && (
+              {formData.isRecurring && (editingRecurringDefId || !editingId) && formData.frequency === 'weekly' && (
                 <div className="days-of-week">
                   <p className="days-label">Select days:</p>
                   <div className="day-checkboxes">
@@ -721,8 +720,8 @@ function App() {
                 {editingId && (() => {
                   const todo = todos.find(t => t.id === editingId)
                   return todo?.isRecurring && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => handleEditRecurringDefinition(todo)}
                       className="btn btn-secondary"
                     >
@@ -764,9 +763,8 @@ function App() {
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           onDoubleClick={() => handleDoubleClick(todo)}
-                          className={`todo-row ${todo.completed ? 'completed' : ''} ${
-                            snapshot.isDragging ? 'dragging' : ''
-                          }`}
+                          className={`todo-row ${todo.completed ? 'completed' : ''} ${snapshot.isDragging ? 'dragging' : ''
+                            }`}
                         >
                           <td className="col-checkbox">
                             <input
@@ -805,7 +803,7 @@ function App() {
                                 }}
                               />
                             ) : (
-                              <span 
+                              <span
                                 className="editable"
                                 onClick={() => !todo.completed && handleInlineEdit(todo, 'title')}
                               >
@@ -835,7 +833,7 @@ function App() {
                                 }}
                               />
                             ) : (
-                              <span 
+                              <span
                                 className="editable"
                                 onClick={() => !todo.completed && handleInlineEdit(todo, 'description')}
                               >
@@ -848,8 +846,8 @@ function App() {
                               <div className="inline-assignee-edit">
                                 <div className="assignee-tags-inline">
                                   {inlineAssignees.map((person, idx) => (
-                                    <span 
-                                      key={idx} 
+                                    <span
+                                      key={idx}
                                       className={`assignee-tag ${person === user?.email ? 'current-user' : ''}`}
                                     >
                                       👤 {person}
@@ -913,7 +911,7 @@ function App() {
                                 </div>
                               </div>
                             ) : (
-                              <div 
+                              <div
                                 className="editable"
                                 onClick={() => !todo.completed && handleInlineEdit(todo, 'assignedTo')}
                                 style={{ cursor: todo.completed ? 'default' : 'pointer' }}
@@ -921,8 +919,8 @@ function App() {
                                 {todo.assignedTo && todo.assignedTo.length > 0 ? (
                                   <div className="assignee-badges">
                                     {todo.assignedTo.map((person, idx) => (
-                                      <span 
-                                        key={idx} 
+                                      <span
+                                        key={idx}
                                         className={`assignee-badge-small ${person === user?.email ? 'current-user' : ''}`}
                                       >
                                         👤 {person}
@@ -954,7 +952,7 @@ function App() {
                                 className="inline-edit-input"
                               />
                             ) : (
-                              <div 
+                              <div
                                 className="editable"
                                 onClick={() => !todo.completed && handleInlineEdit(todo, 'dueDate')}
                                 style={{ cursor: todo.completed ? 'default' : 'pointer' }}
@@ -995,7 +993,7 @@ function App() {
                     </Draggable>
                   ))}
                   {provided.placeholder}
-                  
+
                   {/* Quick add row */}
                   <tr className="quick-add-row">
                     <td className="col-checkbox"></td>
@@ -1006,7 +1004,6 @@ function App() {
                         value={newRowData.title}
                         onChange={(e) => setNewRowData({ ...newRowData, title: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'title')}
-                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
@@ -1017,7 +1014,6 @@ function App() {
                         value={newRowData.description}
                         onChange={(e) => setNewRowData({ ...newRowData, description: e.target.value })}
                         onKeyDown={(e) => handleNewRowKeyDown(e, 'description')}
-                        onBlur={handleQuickAdd}
                         className="quick-add-input"
                       />
                     </td>
@@ -1038,7 +1034,6 @@ function App() {
                           }}
                           onBlur={() => {
                             setTimeout(() => setShowQuickAddAutocomplete(false), 200)
-                            handleQuickAdd()
                           }}
                           className="quick-add-input"
                         />

@@ -136,6 +136,56 @@ See [Authentication Setup](#authentication-setup) for detailed configuration.
 
 ## Development
 
+### Testing
+
+The project includes end-to-end tests using Playwright to validate application behavior.
+
+#### Running Tests
+
+```bash
+cd src/front-end
+
+# Install Playwright browsers (first time only)
+npx playwright install
+
+# Run all tests
+npm test
+
+# Run tests in headed mode (see the browser)
+npm run test:headed
+
+# Run tests with UI mode (interactive)
+npm run test:ui
+
+# Show test report
+npm run test:report
+```
+
+**Using Makefile** (from project root):
+
+```bash
+# Run all tests
+make test
+
+# Run tests with UI mode (interactive)
+make test-ui
+
+# Run tests in headed mode (see the browser)
+make test-headed
+```
+
+**Note**: Tests require both the backend and frontend servers to be running. The test configuration will automatically start them, or you can start them manually first.
+
+#### Test Coverage
+
+The test suite covers:
+- **CRUD Operations**: Adding, editing, and deleting to-do items
+- **Completion**: Marking items as complete/incomplete
+- **Assignees**: Assigning items to people
+- **Reordering**: Drag and drop to reorder items
+- **One-off Items**: Creating items with optional due dates
+- **Recurring Items**: Creating and managing recurring tasks
+
 ### Building for Production
 
 #### Backend

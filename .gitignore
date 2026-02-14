@@ -23,7 +23,11 @@ src/front-end/dist/
 *.log
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo

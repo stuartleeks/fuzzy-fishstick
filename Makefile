@@ -1,4 +1,4 @@
-.PHONY: frontend backend install-frontend install-backend install-deps run docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
+.PHONY: frontend backend install-frontend install-backend install-playwright install-deps run test test-ui test-headed docker-build-backend docker-build-frontend docker-build-all docker-run-backend docker-run-frontend
 
 help: ## show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -11,7 +11,10 @@ install-frontend: ## Install front-end dependencies
 install-backend: ## Install back-end dependencies
 	cd src/back-end && go mod tidy
 
-install-deps: install-backend install-frontend ## Install all dependencies (Go modules and npm packages)
+install-playwright: ## Install Playwright browsers
+	cd src/front-end && npx playwright install --with-deps
+
+install-deps: install-backend install-frontend install-playwright ## Install all dependencies (Go modules, npm packages, and Playwright browsers)
 
 
 frontend: ## Run the front-end dev server
@@ -23,6 +26,19 @@ backend: ## Run the back-end server
 
 run: ## Run both front-end and back-end concurrently
 	$(MAKE) backend & $(MAKE) frontend
+
+kill: ## Kill all running backend and frontend processes
+	lsof -ti:8080 | xargs kill -9 2>/dev/null
+	lsof -ti:5173 | xargs kill -9 2>/dev/null
+
+test: ## Run Playwright tests
+	cd src/front-end && npm test
+
+test-ui: ## Run Playwright tests in interactive UI mode
+	cd src/front-end && npm run test:ui
+
+test-headed: ## Run Playwright tests in headed mode (visible browser)
+	cd src/front-end && npm run test:headed
 
 docker-build-backend: ## Build backend Docker image
 	docker build -t fuzzy-fishstick-backend:latest src/back-end
