@@ -22,7 +22,24 @@ const loadFiltersFromStorage = (): FilterState | null => {
   try {
     const stored = localStorage.getItem(FILTER_STORAGE_KEY)
     if (stored) {
-      return JSON.parse(stored) as FilterState
+      const parsed = JSON.parse(stored)
+      // Validate the structure to ensure it's a valid FilterState
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        typeof parsed.assignedToUser === 'string' &&
+        typeof parsed.showUnassigned === 'boolean' &&
+        typeof parsed.isCollapsed === 'boolean' &&
+        parsed.dueDateFilters &&
+        typeof parsed.dueDateFilters === 'object' &&
+        typeof parsed.dueDateFilters.overdue === 'boolean' &&
+        typeof parsed.dueDateFilters.today === 'boolean' &&
+        typeof parsed.dueDateFilters.tomorrow === 'boolean' &&
+        typeof parsed.dueDateFilters.future === 'boolean'
+      ) {
+        return parsed as FilterState
+      }
+      console.warn('Invalid filter state structure in localStorage')
     }
   } catch (error) {
     console.error('Failed to load filters from localStorage:', error)
@@ -244,7 +261,7 @@ function App() {
         tomorrow: false,
         future: false,
       },
-      isCollapsed: filterState.isCollapsed, // Keep the collapsed state
+      isCollapsed: filterState.isCollapsed, // Preserve UI state (collapsed/expanded)
     })
   }
 
