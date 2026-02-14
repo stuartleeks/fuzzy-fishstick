@@ -4,7 +4,9 @@ export interface AssigneeInputProps {
   assignedTo: string[]
   currentUser?: string
   allowedUsers: string[]
-  onChange: (assignees: string[]) => void
+  onChange?: (assignees: string[]) => void
+  onSave?: (assignees: string[]) => void
+  onCancel?: () => void
   onInputChange?: (value: string) => void
   inputPlaceholder?: string
   showAddButton?: boolean
@@ -12,6 +14,8 @@ export interface AssigneeInputProps {
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   onBlur?: () => void
   className?: string
+  variant?: 'default' | 'inline'
+  blurDelay?: number
 }
 
 export function AssigneeInput({
@@ -19,6 +23,8 @@ export function AssigneeInput({
   currentUser,
   allowedUsers,
   onChange,
+  onSave,
+  onCancel,
   onInputChange,
   inputPlaceholder = 'Add assignee (press Enter)',
   showAddButton = true,
@@ -26,10 +32,23 @@ export function AssigneeInput({
   onKeyDown,
   onBlur,
   className = '',
+  variant = 'default',
+  blurDelay = 200,
 }: AssigneeInputProps) {
+  // For inline variant, manage local state and save on blur
+  // For default variant, update immediately via onChange
+  const isInlineMode = variant === 'inline' && onSave !== undefined
+  const [localAssignees, setLocalAssignees] = useState<string[]>(assignedTo)
   const [currentAssignee, setCurrentAssignee] = useState<string>('')
   const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Update local state when assignedTo prop changes (for inline mode)
+  useEffect(() => {
+    if (isInlineMode) {
+      setLocalAssignees(assignedTo)
+    }
+  }, [assignedTo, isInlineMode])
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -37,24 +56,37 @@ export function AssigneeInput({
     }
   }, [autoFocus])
 
+  // Use local state in inline mode, prop in default mode
+  const effectiveAssignees = isInlineMode ? localAssignees : assignedTo
+
   const getAutocompleteSuggestions = (input: string): string[] => {
     if (!input.trim()) return []
     const lowerInput = input.toLowerCase()
     return allowedUsers.filter(
-      user => user.toLowerCase().includes(lowerInput) && !assignedTo.includes(user)
+      user => user.toLowerCase().includes(lowerInput) && !effectiveAssignees.includes(user)
     )
   }
 
   const handleAddAssignee = (): void => {
     if (currentAssignee.trim()) {
-      onChange([...assignedTo, currentAssignee.trim()])
+      const newAssignees = [...effectiveAssignees, currentAssignee.trim()]
+      if (isInlineMode) {
+        setLocalAssignees(newAssignees)
+      } else if (onChange) {
+        onChange(newAssignees)
+      }
       setCurrentAssignee('')
       setShowAutocomplete(false)
     }
   }
 
   const handleRemoveAssignee = (index: number): void => {
-    onChange(assignedTo.filter((_, i) => i !== index))
+    const newAssignees = effectiveAssignees.filter((_, i) => i !== index)
+    if (isInlineMode) {
+      setLocalAssignees(newAssignees)
+    } else if (onChange) {
+      onChange(newAssignees)
+    }
   }
 
   const handleInputChange = (value: string): void => {
@@ -69,6 +101,8 @@ export function AssigneeInput({
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddAssignee()
+    } else if (e.key === 'Escape' && onCancel) {
+      onCancel()
     }
     if (onKeyDown) {
       onKeyDown(e)
@@ -76,17 +110,107 @@ export function AssigneeInput({
   }
 
   const handleSelectSuggestion = (suggestion: string): void => {
-    onChange([...assignedTo, suggestion])
+    const newAssignees = [...effectiveAssignees, suggestion]
+    if (isInlineMode) {
+      setLocalAssignees(newAssignees)
+    } else if (onChange) {
+      onChange(newAssignees)
+    }
     setCurrentAssignee('')
     setShowAutocomplete(false)
   }
 
+  const handleBlur = (): void => {
+    setTimeout(() => {
+      setShowAutocomplete(false)
+      // In inline mode, save on blur
+      if (isInlineMode && onSave) {
+        onSave(localAssignees)
+      }
+      if (onBlur) {
+        onBlur()
+      }
+    }, blurDelay)
+  }
+
   const suggestions = getAutocompleteSuggestions(currentAssignee)
 
+  // Determine wrapper class based on variant
+  const wrapperClass = variant === 'inline' ? 'inline-assignee-edit' : `assignee-section ${className}`
+  const tagsClass = variant === 'inline' ? 'assignee-tags-inline' : 'assignee-tags'
+  const inputClass = variant === 'inline' ? 'inline-edit-input' : 'input'
+  const inputStyle = variant === 'inline' ? { width: '100%', marginTop: '4px' } : undefined
+
   return (
-    <div className={`assignee-section ${className}`}>
-      <div className="assignee-input-group">
-        <div style={{ position: 'relative', flex: 1 }}>
+    <div className={wrapperClass}>
+      {/* For inline variant, show tags above input */}
+      {variant === 'inline' && effectiveAssignees.length > 0 && (
+        <div className={tagsClass}>
+          {effectiveAssignees.map((person, index) => (
+            <span
+              key={index}
+              className={`assignee-tag ${person === currentUser ? 'current-user' : ''}`}
+            >
+              👤 {person}
+              <button
+                onClick={() => handleRemoveAssignee(index)}
+                className="remove-tag"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* For default variant, show input group with optional add button */}
+      {variant === 'default' && (
+        <div className="assignee-input-group">
+          <div style={{ position: 'relative', flex: 1 }}>
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={inputPlaceholder}
+              value={currentAssignee}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setShowAutocomplete(currentAssignee.length > 0)}
+              onBlur={handleBlur}
+              className={inputClass}
+              style={inputStyle}
+            />
+            {showAutocomplete && suggestions.length > 0 && (
+              <div className="autocomplete-dropdown">
+                {suggestions.map((suggestion, idx) => (
+                  <div
+                    key={idx}
+                    className="autocomplete-item"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      handleSelectSuggestion(suggestion)
+                    }}
+                  >
+                    👤 {suggestion}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {showAddButton && (
+            <button
+              type="button"
+              onClick={handleAddAssignee}
+              className="btn btn-secondary btn-small"
+            >
+              + Add
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* For inline variant, show input without button below tags */}
+      {variant === 'inline' && (
+        <div style={{ position: 'relative' }}>
           <input
             ref={inputRef}
             type="text"
@@ -95,15 +219,9 @@ export function AssigneeInput({
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => setShowAutocomplete(currentAssignee.length > 0)}
-            onBlur={() => {
-              setTimeout(() => {
-                setShowAutocomplete(false)
-                if (onBlur) {
-                  onBlur()
-                }
-              }, 200)
-            }}
-            className="input"
+            onBlur={handleBlur}
+            className={inputClass}
+            style={inputStyle}
           />
           {showAutocomplete && suggestions.length > 0 && (
             <div className="autocomplete-dropdown">
@@ -122,19 +240,12 @@ export function AssigneeInput({
             </div>
           )}
         </div>
-        {showAddButton && (
-          <button
-            type="button"
-            onClick={handleAddAssignee}
-            className="btn btn-secondary btn-small"
-          >
-            + Add
-          </button>
-        )}
-      </div>
-      {assignedTo.length > 0 && (
-        <div className="assignee-tags">
-          {assignedTo.map((person, index) => (
+      )}
+
+      {/* For default variant, show tags below input */}
+      {variant === 'default' && effectiveAssignees.length > 0 && (
+        <div className={tagsClass}>
+          {effectiveAssignees.map((person, index) => (
             <span
               key={index}
               className={`assignee-tag ${person === currentUser ? 'current-user' : ''}`}

@@ -6,7 +6,7 @@ import type { TodoItem, RecurringItemDefinition, FormData, NewRowData, ReorderIt
 import { useAuth } from './AuthProvider'
 import LoginPage from './LoginPage'
 import { TodoItemForm } from './TodoItemForm'
-import { InlineAssigneeEdit } from './InlineAssigneeEdit'
+import { AssigneeInput } from './AssigneeInput'
 import { InlineTextEdit } from './InlineTextEdit'
 
 const API_BASE = '/api'
@@ -537,12 +537,16 @@ function App() {
                           </td>
                           <td className="col-assigned">
                             {inlineEditingId === todo.id && inlineEditField === 'assignedTo' ? (
-                              <InlineAssigneeEdit
-                                initialAssignees={todo.assignedTo || []}
+                              <AssigneeInput
+                                assignedTo={todo.assignedTo || []}
                                 currentUser={user?.email}
                                 allowedUsers={allowedUsers}
                                 onSave={(assignees) => handleInlineEditSave(todo, 'assignedTo', assignees)}
                                 onCancel={handleInlineEditCancel}
+                                variant="inline"
+                                autoFocus={true}
+                                showAddButton={false}
+                                inputPlaceholder="Add assignee"
                                 blurDelay={INLINE_EDIT_BLUR_DELAY}
                               />
                             ) : (
