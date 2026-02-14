@@ -127,4 +127,50 @@ test.describe('Recurring To-Do Items', () => {
     await expect(page.locator('text=Every 3 days task')).toBeVisible();
     expect(await helpers.hasRecurringBadge('Every 3 days task')).toBe(true);
   });
+
+  test('should show recurrence options when converting one-off item to recurring', async ({ page }) => {
+    // Create a one-off item
+    await helpers.addQuickTodo('One-off task', 'Not recurring yet');
+    
+    // Verify it's not recurring
+    expect(await helpers.hasRecurringBadge('One-off task')).toBe(false);
+    
+    // Edit the item
+    const row = page.locator('tr', { has: page.locator('text="One-off task"') }).first();
+    await row.locator('button[title="Edit"]').click();
+    
+    // Wait for form to appear
+    await page.waitForSelector('input[placeholder="Title"]', { timeout: 5000 });
+    
+    // Check the recurring checkbox
+    await page.check('label:has-text("Make this a recurring item") input[type="checkbox"]');
+    
+    // Verify recurring options appear
+    await expect(page.locator('select')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('input[type="number"][placeholder="Interval"]')).toBeVisible();
+    
+    // Select weekly frequency
+    await page.selectOption('select', 'weekly');
+    
+    // Verify days checkboxes appear for weekly frequency
+    await expect(page.locator('.day-checkboxes')).toBeVisible({ timeout: 3000 });
+    
+    // Configure the recurring pattern
+    await page.fill('input[type="number"][placeholder="Interval"]', '1');
+    await page.check('input[type="checkbox"]:near(:text("Mon"))');
+    await page.check('input[type="checkbox"]:near(:text("Wed"))');
+    
+    // Submit the form
+    await page.click('button[type="submit"]:has-text("Update")');
+    
+    // Wait for the form to close
+    await page.waitForSelector('input[placeholder="Title"]', { state: 'detached', timeout: 10000 }).catch(() => {});
+    
+    // Wait for update to complete
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    
+    // Verify the item is now recurring
+    expect(await helpers.hasRecurringBadge('One-off task')).toBe(true);
+  });
 });
