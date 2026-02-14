@@ -7,6 +7,28 @@ import { useAuth } from './AuthProvider'
 import LoginPage from './LoginPage'
 
 const API_BASE = '/api'
+const FILTER_STORAGE_KEY = 'todoapp-filter-state'
+
+// Helper functions for localStorage
+const saveFiltersToStorage = (filters: FilterState): void => {
+  try {
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters))
+  } catch (error) {
+    console.error('Failed to save filters to localStorage:', error)
+  }
+}
+
+const loadFiltersFromStorage = (): FilterState | null => {
+  try {
+    const stored = localStorage.getItem(FILTER_STORAGE_KEY)
+    if (stored) {
+      return JSON.parse(stored) as FilterState
+    }
+  } catch (error) {
+    console.error('Failed to load filters from localStorage:', error)
+  }
+  return null
+}
 
 function App() {
   const { isAuthenticated, user, logout, getAccessToken } = useAuth()
@@ -40,16 +62,30 @@ function App() {
     daysOfWeek: [],
     dueDate: '',
   })
-  const [filterState, setFilterState] = useState<FilterState>({
-    assignedToUser: '',
-    showUnassigned: true,
-    dueDateFilters: {
-      overdue: false,
-      today: false,
-      tomorrow: false,
-      future: false,
-    },
+  const [filterState, setFilterState] = useState<FilterState>(() => {
+    // Try to load saved filters from localStorage
+    const savedFilters = loadFiltersFromStorage()
+    if (savedFilters) {
+      return savedFilters
+    }
+    // Default filter state
+    return {
+      assignedToUser: '',
+      showUnassigned: true,
+      dueDateFilters: {
+        overdue: false,
+        today: false,
+        tomorrow: false,
+        future: false,
+      },
+      isCollapsed: false,
+    }
   })
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    saveFiltersToStorage(filterState)
+  }, [filterState])
 
   // Setup axios interceptor to add auth token
   useEffect(() => {
@@ -208,6 +244,15 @@ function App() {
         tomorrow: false,
         future: false,
       },
+      isCollapsed: filterState.isCollapsed, // Keep the collapsed state
+    })
+  }
+
+  // Toggle filter section collapsed state
+  const toggleFilterCollapsed = () => {
+    setFilterState({
+      ...filterState,
+      isCollapsed: !filterState.isCollapsed,
     })
   }
 
@@ -834,99 +879,110 @@ function App() {
 
         {/* Filter Controls */}
         <div className="filter-section">
-          <h3 className="filter-heading">Filter Items</h3>
-          
-          <div className="filter-controls">
-            {/* Assignee Filter */}
-            <div className="filter-group">
-              <label className="filter-label">Assigned To:</label>
-              <div className="filter-assignee-controls">
-                <button
-                  onClick={handleAssignedToMe}
-                  className={`btn btn-filter ${filterState.assignedToUser === user?.email ? 'active' : ''}`}
-                  title="Show items assigned to me"
-                >
-                  👤 Assigned to me
-                </button>
-                <select
-                  value={filterState.assignedToUser}
-                  onChange={(e) => setFilterState({ ...filterState, assignedToUser: e.target.value })}
-                  className="filter-select"
-                >
-                  <option value="">All users</option>
-                  {allowedUsers.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-                <label className="filter-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={filterState.showUnassigned}
-                    onChange={(e) => setFilterState({ ...filterState, showUnassigned: e.target.checked })}
-                  />
-                  Show unassigned
-                </label>
-              </div>
-            </div>
-
-            {/* Due Date Filter */}
-            <div className="filter-group">
-              <label className="filter-label">Due Date:</label>
-              <div className="filter-date-controls">
-                <label className="filter-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={filterState.dueDateFilters.overdue}
-                    onChange={(e) => setFilterState({
-                      ...filterState,
-                      dueDateFilters: { ...filterState.dueDateFilters, overdue: e.target.checked }
-                    })}
-                  />
-                  🔴 Overdue
-                </label>
-                <label className="filter-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={filterState.dueDateFilters.today}
-                    onChange={(e) => setFilterState({
-                      ...filterState,
-                      dueDateFilters: { ...filterState.dueDateFilters, today: e.target.checked }
-                    })}
-                  />
-                  📅 Today
-                </label>
-                <label className="filter-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={filterState.dueDateFilters.tomorrow}
-                    onChange={(e) => setFilterState({
-                      ...filterState,
-                      dueDateFilters: { ...filterState.dueDateFilters, tomorrow: e.target.checked }
-                    })}
-                  />
-                  ⏭️ Tomorrow
-                </label>
-                <label className="filter-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={filterState.dueDateFilters.future}
-                    onChange={(e) => setFilterState({
-                      ...filterState,
-                      dueDateFilters: { ...filterState.dueDateFilters, future: e.target.checked }
-                    })}
-                  />
-                  ⏩ Future
-                </label>
-              </div>
-            </div>
-
-            {/* Clear Filters Button */}
-            <div className="filter-actions">
-              <button onClick={handleClearFilters} className="btn btn-secondary btn-clear-filters">
-                Clear All Filters
-              </button>
-            </div>
+          <div className="filter-heading-container">
+            <h3 className="filter-heading">Filter Items</h3>
+            <button
+              onClick={toggleFilterCollapsed}
+              className="btn-collapse"
+              aria-label={filterState.isCollapsed ? "Expand filters" : "Collapse filters"}
+            >
+              {filterState.isCollapsed ? '▼' : '▲'}
+            </button>
           </div>
+          
+          {!filterState.isCollapsed && (
+            <div className="filter-controls">
+              {/* Assignee Filter */}
+              <div className="filter-group">
+                <label className="filter-label">Assigned To:</label>
+                <div className="filter-assignee-controls">
+                  <button
+                    onClick={handleAssignedToMe}
+                    className={`btn btn-filter ${filterState.assignedToUser === user?.email ? 'active' : ''}`}
+                    title="Show items assigned to me"
+                  >
+                    👤 Assigned to me
+                  </button>
+                  <select
+                    value={filterState.assignedToUser}
+                    onChange={(e) => setFilterState({ ...filterState, assignedToUser: e.target.value })}
+                    className="filter-select"
+                  >
+                    <option value="">All users</option>
+                    {allowedUsers.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={filterState.showUnassigned}
+                      onChange={(e) => setFilterState({ ...filterState, showUnassigned: e.target.checked })}
+                    />
+                    Include unassigned
+                  </label>
+                </div>
+              </div>
+
+              {/* Due Date Filter */}
+              <div className="filter-group">
+                <label className="filter-label">Due Date:</label>
+                <div className="filter-date-controls">
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={filterState.dueDateFilters.overdue}
+                      onChange={(e) => setFilterState({
+                        ...filterState,
+                        dueDateFilters: { ...filterState.dueDateFilters, overdue: e.target.checked }
+                      })}
+                    />
+                    🔴 Overdue
+                  </label>
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={filterState.dueDateFilters.today}
+                      onChange={(e) => setFilterState({
+                        ...filterState,
+                        dueDateFilters: { ...filterState.dueDateFilters, today: e.target.checked }
+                      })}
+                    />
+                    📅 Today
+                  </label>
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={filterState.dueDateFilters.tomorrow}
+                      onChange={(e) => setFilterState({
+                        ...filterState,
+                        dueDateFilters: { ...filterState.dueDateFilters, tomorrow: e.target.checked }
+                      })}
+                    />
+                    ⏭️ Tomorrow
+                  </label>
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={filterState.dueDateFilters.future}
+                      onChange={(e) => setFilterState({
+                        ...filterState,
+                        dueDateFilters: { ...filterState.dueDateFilters, future: e.target.checked }
+                      })}
+                    />
+                    ⏩ Future
+                  </label>
+                </div>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="filter-actions">
+                <button onClick={handleClearFilters} className="btn btn-secondary btn-clear-filters">
+                  Clear All Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <table className="todo-table">

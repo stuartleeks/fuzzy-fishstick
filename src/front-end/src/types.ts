@@ -62,4 +62,5 @@ export interface FilterState {
     tomorrow: boolean
     future: boolean
   }
+  isCollapsed: boolean // Whether the filter section is collapsed
 }
