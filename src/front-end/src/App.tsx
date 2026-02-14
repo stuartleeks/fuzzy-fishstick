@@ -127,16 +127,21 @@ function App() {
   }
 
   // Helper function to determine if a date is overdue, today, tomorrow, or future
+  const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+  
   const getDateCategory = (dateStr?: string): 'overdue' | 'today' | 'tomorrow' | 'future' | 'none' => {
     if (!dateStr) return 'none'
     
+    // Use date-only comparison to avoid timezone issues
+    // Extract date parts from the ISO date string (YYYY-MM-DD)
+    const [year, month, day] = dateStr.split('T')[0].split('-').map(Number)
+    const itemDate = new Date(year, month - 1, day) // month is 0-indexed
+    
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const itemDate = new Date(dateStr)
-    const itemDateOnly = new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate())
     
-    const diffMs = itemDateOnly.getTime() - today.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffMs = itemDate.getTime() - today.getTime()
+    const diffDays = Math.floor(diffMs / MILLISECONDS_PER_DAY)
     
     if (diffDays < 0) return 'overdue'
     if (diffDays === 0) return 'today'
