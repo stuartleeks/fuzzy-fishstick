@@ -24,6 +24,9 @@ function App() {
   const [showFormAutocomplete, setShowFormAutocomplete] = useState<boolean>(false)
   const [showInlineAutocomplete, setShowInlineAutocomplete] = useState<boolean>(false)
   const [showQuickAddAutocomplete, setShowQuickAddAutocomplete] = useState<boolean>(false)
+  const [formAutocompleteIndex, setFormAutocompleteIndex] = useState<number>(-1)
+  const [inlineAutocompleteIndex, setInlineAutocompleteIndex] = useState<number>(-1)
+  const [quickAddAutocompleteIndex, setQuickAddAutocompleteIndex] = useState<number>(-1)
   const [newRowData, setNewRowData] = useState<NewRowData>({
     title: '',
     description: '',
@@ -366,9 +369,30 @@ function App() {
   }
 
   const handleAssigneeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
+    const suggestions = getAutocompleteSuggestions(formData.currentAssignee, formData.assignedTo)
+    const isAutocompleteShown = showFormAutocomplete && suggestions.length > 0
+    
+    if (e.key === 'ArrowDown' && isAutocompleteShown) {
+      e.preventDefault()
+      setFormAutocompleteIndex(prev => (prev + 1) % suggestions.length)
+    } else if (e.key === 'ArrowUp' && isAutocompleteShown) {
+      e.preventDefault()
+      setFormAutocompleteIndex(prev => prev <= 0 ? suggestions.length - 1 : prev - 1)
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && isAutocompleteShown && formAutocompleteIndex >= 0) {
+      e.preventDefault()
+      const selectedSuggestion = suggestions[formAutocompleteIndex]
+      if (selectedSuggestion) {
+        setFormData({ ...formData, assignedTo: [...formData.assignedTo, selectedSuggestion], currentAssignee: '' })
+        setShowFormAutocomplete(false)
+        setFormAutocompleteIndex(-1)
+      }
+    } else if (e.key === 'Enter') {
       e.preventDefault()
       handleAddAssignee()
+    } else if (e.key === 'Escape' && isAutocompleteShown) {
+      e.preventDefault()
+      setShowFormAutocomplete(false)
+      setFormAutocompleteIndex(-1)
     }
   }
 
@@ -491,6 +515,37 @@ function App() {
   }
 
   const handleNewRowKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string): void => {
+    if (field === 'assignedTo') {
+      const entries = newRowData.assignedTo.split(',').map(e => e.trim())
+      const lastEntry = entries[entries.length - 1] || ''
+      const existingAssignees = entries.slice(0, -1).filter(e => e.length > 0)
+      const suggestions = getAutocompleteSuggestions(lastEntry, existingAssignees)
+      const isAutocompleteShown = showQuickAddAutocomplete && suggestions.length > 0
+      
+      if (e.key === 'ArrowDown' && isAutocompleteShown) {
+        e.preventDefault()
+        setQuickAddAutocompleteIndex(prev => (prev + 1) % suggestions.length)
+      } else if (e.key === 'ArrowUp' && isAutocompleteShown) {
+        e.preventDefault()
+        setQuickAddAutocompleteIndex(prev => prev <= 0 ? suggestions.length - 1 : prev - 1)
+      } else if ((e.key === 'Enter' || e.key === 'Tab') && isAutocompleteShown && quickAddAutocompleteIndex >= 0) {
+        e.preventDefault()
+        const selectedSuggestion = suggestions[quickAddAutocompleteIndex]
+        if (selectedSuggestion) {
+          const beforeLast = entries.slice(0, -1).filter(e => e.length > 0)
+          setNewRowData({ ...newRowData, assignedTo: [...beforeLast, selectedSuggestion].join(', ') + ', ' })
+          setShowQuickAddAutocomplete(false)
+          setQuickAddAutocompleteIndex(-1)
+        }
+        return
+      } else if (e.key === 'Escape' && isAutocompleteShown) {
+        e.preventDefault()
+        setShowQuickAddAutocomplete(false)
+        setQuickAddAutocompleteIndex(-1)
+        return
+      }
+    }
+    
     if (e.key === 'Enter') {
       e.preventDefault()
       // Check if title has content before submitting
@@ -551,10 +606,19 @@ function App() {
                       onChange={(e) => {
                         setFormData({ ...formData, currentAssignee: e.target.value })
                         setShowFormAutocomplete(e.target.value.length > 0)
+                        setFormAutocompleteIndex(-1)
                       }}
                       onKeyDown={handleAssigneeKeyDown}
-                      onFocus={() => setShowFormAutocomplete(formData.currentAssignee.length > 0)}
-                      onBlur={() => setTimeout(() => setShowFormAutocomplete(false), 200)}
+                      onFocus={() => {
+                        setShowFormAutocomplete(formData.currentAssignee.length > 0)
+                        setFormAutocompleteIndex(-1)
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          setShowFormAutocomplete(false)
+                          setFormAutocompleteIndex(-1)
+                        }, 200)
+                      }}
                       className="input"
                     />
                     {showFormAutocomplete && getAutocompleteSuggestions(formData.currentAssignee, formData.assignedTo).length > 0 && (
@@ -562,10 +626,11 @@ function App() {
                         {getAutocompleteSuggestions(formData.currentAssignee, formData.assignedTo).map((suggestion, idx) => (
                           <div
                             key={idx}
-                            className="autocomplete-item"
+                            className={`autocomplete-item${idx === formAutocompleteIndex ? ' selected' : ''}`}
                             onClick={() => {
                               setFormData({ ...formData, assignedTo: [...formData.assignedTo, suggestion], currentAssignee: '' })
                               setShowFormAutocomplete(false)
+                              setFormAutocompleteIndex(-1)
                             }}
                           >
                             👤 {suggestion}
@@ -868,21 +933,51 @@ function App() {
                                     onChange={(e) => {
                                       setInlineAssigneeInput(e.target.value)
                                       setShowInlineAutocomplete(e.target.value.length > 0)
+                                      setInlineAutocompleteIndex(-1)
                                     }}
                                     onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && inlineAssigneeInput.trim()) {
+                                      const suggestions = getAutocompleteSuggestions(inlineAssigneeInput, inlineAssignees)
+                                      const isAutocompleteShown = showInlineAutocomplete && suggestions.length > 0
+                                      
+                                      if (e.key === 'ArrowDown' && isAutocompleteShown) {
+                                        e.preventDefault()
+                                        setInlineAutocompleteIndex(prev => (prev + 1) % suggestions.length)
+                                      } else if (e.key === 'ArrowUp' && isAutocompleteShown) {
+                                        e.preventDefault()
+                                        setInlineAutocompleteIndex(prev => prev <= 0 ? suggestions.length - 1 : prev - 1)
+                                      } else if ((e.key === 'Enter' || e.key === 'Tab') && isAutocompleteShown && inlineAutocompleteIndex >= 0) {
+                                        e.preventDefault()
+                                        const selectedSuggestion = suggestions[inlineAutocompleteIndex]
+                                        if (selectedSuggestion) {
+                                          setInlineAssignees([...inlineAssignees, selectedSuggestion])
+                                          setInlineAssigneeInput('')
+                                          setShowInlineAutocomplete(false)
+                                          setInlineAutocompleteIndex(-1)
+                                        }
+                                      } else if (e.key === 'Enter' && inlineAssigneeInput.trim()) {
                                         e.preventDefault()
                                         setInlineAssignees([...inlineAssignees, inlineAssigneeInput.trim()])
                                         setInlineAssigneeInput('')
                                         setShowInlineAutocomplete(false)
+                                        setInlineAutocompleteIndex(-1)
                                       } else if (e.key === 'Escape') {
-                                        handleInlineEditCancel()
+                                        if (isAutocompleteShown) {
+                                          e.preventDefault()
+                                          setShowInlineAutocomplete(false)
+                                          setInlineAutocompleteIndex(-1)
+                                        } else {
+                                          handleInlineEditCancel()
+                                        }
                                       }
                                     }}
-                                    onFocus={() => setShowInlineAutocomplete(inlineAssigneeInput.length > 0)}
+                                    onFocus={() => {
+                                      setShowInlineAutocomplete(inlineAssigneeInput.length > 0)
+                                      setInlineAutocompleteIndex(-1)
+                                    }}
                                     onBlur={() => {
                                       setTimeout(() => {
                                         setShowInlineAutocomplete(false)
+                                        setInlineAutocompleteIndex(-1)
                                         handleInlineEditSave(todo, 'assignedTo', inlineAssignees)
                                       }, INLINE_EDIT_BLUR_DELAY)
                                     }}
@@ -895,12 +990,13 @@ function App() {
                                       {getAutocompleteSuggestions(inlineAssigneeInput, inlineAssignees).map((suggestion, idx) => (
                                         <div
                                           key={idx}
-                                          className="autocomplete-item"
+                                          className={`autocomplete-item${idx === inlineAutocompleteIndex ? ' selected' : ''}`}
                                           onMouseDown={(e) => {
                                             e.preventDefault()
                                             setInlineAssignees([...inlineAssignees, suggestion])
                                             setInlineAssigneeInput('')
                                             setShowInlineAutocomplete(false)
+                                            setInlineAutocompleteIndex(-1)
                                           }}
                                         >
                                           👤 {suggestion}
@@ -1026,14 +1122,19 @@ function App() {
                           onChange={(e) => {
                             setNewRowData({ ...newRowData, assignedTo: e.target.value })
                             setShowQuickAddAutocomplete(e.target.value.length > 0 && e.target.value.split(',').pop()?.trim().length! > 0)
+                            setQuickAddAutocompleteIndex(-1)
                           }}
                           onKeyDown={(e) => handleNewRowKeyDown(e, 'assignedTo')}
                           onFocus={() => {
                             const lastEntry = newRowData.assignedTo.split(',').pop()?.trim() || ''
                             setShowQuickAddAutocomplete(lastEntry.length > 0)
+                            setQuickAddAutocompleteIndex(-1)
                           }}
                           onBlur={() => {
-                            setTimeout(() => setShowQuickAddAutocomplete(false), 200)
+                            setTimeout(() => {
+                              setShowQuickAddAutocomplete(false)
+                              setQuickAddAutocompleteIndex(-1)
+                            }, 200)
                           }}
                           className="quick-add-input"
                         />
@@ -1047,12 +1148,13 @@ function App() {
                               {suggestions.map((suggestion, idx) => (
                                 <div
                                   key={idx}
-                                  className="autocomplete-item"
+                                  className={`autocomplete-item${idx === quickAddAutocompleteIndex ? ' selected' : ''}`}
                                   onMouseDown={(e) => {
                                     e.preventDefault()
                                     const beforeLast = entries.slice(0, -1).filter(e => e.length > 0)
                                     setNewRowData({ ...newRowData, assignedTo: [...beforeLast, suggestion].join(', ') + ', ' })
                                     setShowQuickAddAutocomplete(false)
+                                    setQuickAddAutocompleteIndex(-1)
                                   }}
                                 >
                                   👤 {suggestion}
